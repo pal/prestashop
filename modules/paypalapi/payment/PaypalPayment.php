@@ -17,17 +17,22 @@ class PaypalPayment extends PaypalAPI
 
 		// Making request
 		$vars = '?fromPayPal=1';
-		$returnURL = (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/paypalapi/payment/submit.php'.$vars;
-		$cancelURL = (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'order.php';
-		$paymentAmount = number_format(floatval($cart->getOrderTotal()), 2, '.', '');
+		$returnURL = Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/paypalapi/payment/submit.php'.$vars;
+		$cancelURL = Tools::getHttpHost(true, true).__PS_BASE_URI__.'order.php';
+		$paymentAmount = floatval($cart->getOrderTotal());
 		$currencyCodeType = strval($currency->iso_code);
 		$paymentType = 'Sale';
 		$request = '&Amt='.urlencode($paymentAmount).'&PAYMENTACTION='.urlencode($paymentType).'&ReturnUrl='.urlencode($returnURL).'&CANCELURL='.urlencode($cancelURL).'&CURRENCYCODE='.urlencode($currencyCodeType).'&NOSHIPPING=1';
+		if ($this->_pp_integral)
+			$request .= '&SOLUTIONTYPE=Sole&LANDINGPAGE=Billing';
+		else
+			$request .= '&SOLUTIONTYPE=Mark&LANDINGPAGE=Login';
+		$request .= '&LOCALECODE='.strval($this->getCountryCode());
 		if ($this->_header)
 			$request .= '&HDRIMG='.urlencode($this->_header);
 
 		// Calling PayPal API
-		include(_PS_MODULE_DIR_.'paypalapi/api/PaypalLib.php');
+		include(_PS_MODULE_DIR_.'paypalapi/api/paypallib.php');
 		$ppAPI = new PaypalLib();
 		$result = $ppAPI->makeCall($this->getAPIURL(), $this->getAPIScript(), 'SetExpressCheckout', $request);
 		$this->_logs = array_merge($this->_logs, $ppAPI->getLogs());
@@ -36,6 +41,10 @@ class PaypalPayment extends PaypalAPI
 
 	public function home($params)
 	{
+		global $smarty;
+
+		$smarty->assign('integral', $this->_pp_integral);
+		$smarty->assign('logo', _MODULE_DIR_.$this->name.'/paypalapi.gif');
 		return $this->display(__FILE__.'../', 'payment.tpl');
 	}
 

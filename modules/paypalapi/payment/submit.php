@@ -6,7 +6,7 @@ include_once(dirname(__FILE__).'/../../../config/config.inc.php');
 include_once(dirname(__FILE__).'/../../../init.php');
 
 include_once(_PS_MODULE_DIR_.'paypalapi/paypalapi.php');
-include_once(_PS_MODULE_DIR_.'paypalapi/payment/PaypalPayment.php');
+include_once(_PS_MODULE_DIR_.'paypalapi/payment/paypalpayment.php');
 
 $ppPayment = new PaypalPayment();
 $errors = array();
@@ -28,6 +28,7 @@ function getAuthorization()
 			{
 
 				$cookie->paypal_token = strval($result['TOKEN']);
+				$cookie->paypal_token_date = time();
 				header('Location: https://'.$ppPayment->getPayPalURL().'/webscr&cmd=_express-checkout&token='.urldecode(strval($cookie->paypal_token)).'&useraction=commit');
 			}
 			else
@@ -50,10 +51,11 @@ function displayConfirm()
 	include(_PS_ROOT_DIR_.'/header.php');
 
 	$smarty->assign(array(
+		'logo' => $ppPayment->getLogo(),
 		'cust_currency' => $cookie->id_currency,
 		'currency' => $ppPayment->getCurrency(),
-		'total' => number_format($cart->getOrderTotal(true, 3), 2, '.', ''),
-		'this_path_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/'. $ppPayment->name.'/',
+		'total' => $cart->getOrderTotal(true, 3),
+		'this_path_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/'. $ppPayment->name.'/',
 		'mode' => 'payment/'
 	));
 

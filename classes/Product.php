@@ -145,6 +145,7 @@ class		Product extends ObjectModel
 	/*** @var array Tags */
 	public		$tags;
 	
+	public	static $_taxCalculationMethod = PS_TAX_EXC;
 	private static $_prices = array();
 
 	private static $_incat = array();
@@ -205,8 +206,11 @@ class		Product extends ObjectModel
 			$this->tax_rate = floatval($tax->rate);
 			$this->new = $this->isNew();
 		}
-		$this->category = Category::getLinkRewrite(intval($this->id_category_default), intval($id_lang));
-		$this->tags = Tag::getProductTags($this->id);
+		
+		if ($this->id_category_default)
+			$this->category = Category::getLinkRewrite(intval($this->id_category_default), intval($id_lang));
+		if ($this->id)
+			$this->tags = Tag::getProductTags(intval($this->id));
 	}
 
 	public function getFields()
@@ -280,6 +284,13 @@ class		Product extends ObjectModel
 			}
 		}
 		return $fields;
+	}
+
+	public static function initPricesComputation()
+	{
+		global $cookie;
+
+		self::$_taxCalculationMethod = $cookie->id_customer ? Group::getPriceDisplayMethod(intval($cookie->id_customer)) : Group::getDefaultPriceDisplayMethod();
 	}
 
 	/**
@@ -392,7 +403,15 @@ class		Product extends ObjectModel
 			!$this->deleteProductFeatures() OR
 			!$this->deleteTags() OR
 			!$this->deleteCartProducts() OR
-        	!$this->deleteAttributesImpacts())
+        	!$this->deleteAttributesImpacts() OR
+			!$this->deleteAttachments() OR
+			!$this->deleteCustomization() OR
+			!$this->deleteQuantityDiscounts() OR
+			!$this->deletePack() OR
+			!$this->deleteProductSale() OR
+			!$this->deleteSceneProducts() OR
+			!$this->deleteSearchIndexes() OR
+			!$this->deleteAccessories())
 		return false;
 		if ($id = ProductDownload::getIdFromIdProduct($this->id))
 			if ($productDownload = new ProductDownload($id) AND !$productDownload->delete(true))
@@ -402,7 +421,7 @@ class		Product extends ObjectModel
 
 	public function deleteSelection($products)
 	{
-		$return = true;
+		$return = 1;
 		foreach ($products AS $id_product)
 		{
 			$product = new Product(intval($id_product));
@@ -793,9 +812,7 @@ class		Product extends ObjectModel
 		DELETE FROM `'._DB_PREFIX_.'product_attribute_combination`
 		WHERE `id_product_attribute` IN (SELECT `id_product_attribute` FROM `'._DB_PREFIX_.'product_attribute` WHERE `id_product` = '.intval($this->id).')');
 
-		$result2 = Db::getInstance()->Execute('
-		DELETE FROM `'._DB_PREFIX_.'product_attribute`
-		WHERE `id_product` = '.intval($this->id));
+		$result2 = Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'product_attribute` WHERE `id_product` = '.intval($this->id));
 
 		return ($result & $result2);
 	}
@@ -807,9 +824,7 @@ class		Product extends ObjectModel
 	*/
     public function deleteAttributesImpacts()
     {
-        return Db::getInstance()->Execute('
-		DELETE FROM `'._DB_PREFIX_.'attribute_impact`
-		WHERE `id_product` = '.intval($this->id));
+        return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'attribute_impact` WHERE `id_product` = '.intval($this->id));
     }
 
 	/**
@@ -820,6 +835,89 @@ class		Product extends ObjectModel
 	public function deleteProductFeatures()
 	{
 		return $this->deleteFeatures();
+	}
+	
+	/**
+	* Delete product attachments
+	*
+	* @return array Deletion result
+	*/
+	public function deleteAttachments()
+	{
+		$attachments = Db::getInstance()->ExecuteS('SELECT id_attachment FROM `'._DB_PREFIX_.'product_attachment` WHERE `id_product` = '.intval($this->id));
+		$result = true;
+		foreach ($attachments AS $attachment)
+		{
+			$attachmentObj = new Attachment(intval($attachment['id_attachment']));
+			if (Validate::isLoadedObject($attachmentObj))
+				$result &= $attachmentObj->delete();
+		}
+		
+		return $result;
+	}
+	
+	/**
+	* Delete product customizations
+	*
+	* @return array Deletion result
+	*/
+	public function deleteCustomization()
+	{
+		return 
+		Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'customization_field` WHERE `id_product` = '.intval($this->id)) && 
+		Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'customization_field_lang` WHERE `id_customization_field` NOT IN (SELECT id_customization_field FROM `'._DB_PREFIX_.'customization_field`)');
+	}
+	
+	/**
+	* Delete product quantity discounts
+	*
+	* @return array Deletion result
+	*/
+	public function deleteQuantityDiscounts()
+	{
+		return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'discount_quantity` WHERE `id_product` = '.intval($this->id));
+	}
+	
+	/**
+	* Delete product pack details
+	*
+	* @return array Deletion result
+	*/
+	public function deletePack()
+	{
+		return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'pack` WHERE `id_product_pack` = '.intval($this->id).' OR `id_product_item` = '.intval($this->id));
+	}
+	
+	/**
+	* Delete product sales
+	*
+	* @return array Deletion result
+	*/
+	public function deleteProductSale()
+	{
+		return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'product_sale` WHERE `id_product` = '.intval($this->id));
+	}
+	
+	/**
+	* Delete product in its scenes
+	*
+	* @return array Deletion result
+	*/
+	public function deleteSceneProducts()
+	{
+		return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'scene_products` WHERE `id_product` = '.intval($this->id));
+	}
+	
+	/**
+	* Delete product indexed words
+	*
+	* @return array Deletion result
+	*/
+	public function deleteSearchIndexes()
+	{
+		return 
+		Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'search_index` WHERE `id_product` = '.intval($this->id)) && 
+		Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'search_word` WHERE `id_word` NOT IN (SELECT id_word FROM `'._DB_PREFIX_.'search_index`)');
 	}
 
 	/**
@@ -997,7 +1095,8 @@ class		Product extends ObjectModel
 
 		$result = Db::getInstance()->ExecuteS('
 			SELECT p.*, pl.`description`, pl.`description_short`, pl.`link_rewrite`, pl.`meta_description`, pl.`meta_keywords`, pl.`meta_title`, pl.`name`, p.`ean13`,
-				i.`id_image`, il.`legend`, t.`rate`, m.`name` AS manufacturer_name
+				i.`id_image`, il.`legend`, t.`rate`, m.`name` AS manufacturer_name, DATEDIFF(p.`date_add`, DATE_SUB(NOW(), INTERVAL '.(Validate::isUnsignedInt(Configuration::get('PS_NB_DAYS_NEW_PRODUCT')) ? Configuration::get('PS_NB_DAYS_NEW_PRODUCT') : 20).' DAY)) > 0 AS new, 
+				(p.`price` * ((100 + (t.`rate`))/100) - IF((DATEDIFF(`reduction_from`, CURDATE()) <= 0 AND DATEDIFF(`reduction_to`, CURDATE()) >=0) OR `reduction_from` = `reduction_to`, IF(`reduction_price` > 0, `reduction_price`, (p.`price` * ((100 + (t.`rate`))/100) * `reduction_percent` / 100)),0)) AS orderprice 
 			FROM `'._DB_PREFIX_.'product` p
 			LEFT JOIN `'._DB_PREFIX_.'product_lang` pl ON (p.`id_product` = pl.`id_product` AND pl.`id_lang` = '.intval($id_lang).')
 			LEFT JOIN `'._DB_PREFIX_.'image` i ON (i.`id_product` = p.`id_product` AND i.`cover` = 1)
@@ -1085,13 +1184,18 @@ class		Product extends ObjectModel
             $orderByPrefix = 'pl';
 		if (!Validate::isOrderBy($orderBy) OR !Validate::isOrderWay($orderWay))
 			die (Tools::displayError());
-
+		$currentDate = date('Y-m-d');
 		if ($count)
 		{
 			$sql = '
 			SELECT COUNT(DISTINCT p.`id_product`) AS nb
 			FROM `'._DB_PREFIX_.'product` p
 			WHERE p.`active` = 1
+			AND (`reduction_price` > 0 OR `reduction_percent` > 0)
+			'.((!$beginning AND !$ending) ?
+			'	AND (`reduction_from` = `reduction_to` OR (`reduction_from` <= \''.pSQL($currentDate).'\' AND `reduction_to` >= \''.pSQL($currentDate).'\'))'
+			:
+				($beginning ? 'AND `reduction_from` <= \''.pSQL($beginning).'\'' : '').($ending ? 'AND `reduction_to` >= \''.pSQL($ending).'\'' : '')).'
 			AND p.`id_product` IN (
 				SELECT cp.`id_product`
 				FROM `'._DB_PREFIX_.'category_group` cg
@@ -1101,7 +1205,6 @@ class		Product extends ObjectModel
 			$result = Db::getInstance()->getRow($sql);
 			return intval($result['nb']);
 		}
-		$currentDate = date('Y-m-d');
 		$sql = '
 		SELECT p.*, pl.`description`, pl.`description_short`, pl.`link_rewrite`, pl.`meta_description`, pl.`meta_keywords`, pl.`meta_title`, pl.`name`, p.`ean13`, i.`id_image`, il.`legend`, t.`rate`, (p.`reduction_price` + (p.`reduction_percent` * p.`price`)) AS myprice, m.`name` AS manufacturer_name
 		FROM `'._DB_PREFIX_.'product` p
@@ -1223,16 +1326,22 @@ class		Product extends ObjectModel
 	* @param boolean $tax With taxes or not (optional)
 	* @param integer $id_product_attribute Product attribute id (optional)
 	* @param integer $decimals Number of decimals (optional)
-	* @param integer $divisor Util when paying many time without fees (optional)
+	* @param integer $divisor Useful when paying many time without fees (optional)
 	* @return float Product price
 	*/
-	public static function getPriceStatic($id_product, $usetax = true, $id_product_attribute = NULL, $decimals = 6, $divisor = NULL, $only_reduc = false, $usereduc = true, $quantity = 1, $forceAssociatedTax = false)
+	public static function getPriceStatic($id_product, $usetax = true, $id_product_attribute = NULL, $decimals = 6, $divisor = NULL, $only_reduc = false, $usereduc = true, $quantity = 1, $forceAssociatedTax = false, $id_customer = NULL, $id_cart = NULL, $id_address_delivery = NULL)
 	{
 		global $cookie;
 
 		// Get id_customer if exists
-		$id_customer = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_customer) AND $cookie->id_customer)
-			? intval($cookie->id_customer) : null);
+		if (!$id_customer)
+			$id_customer = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_customer) AND $cookie->id_customer) ? intval($cookie->id_customer) : null);
+
+		if (!$id_cart)
+			$id_cart = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_cart) AND $cookie->id_cart) ? intval($cookie->id_cart) : null);
+
+		if (!$id_address_delivery)
+			$id_address_delivery = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_address_delivery) AND $cookie->id_address_delivery) ? intval($cookie->id_address_delivery) : null);
 
 		if (!Validate::isBool($usetax) OR !Validate::isUnsignedId($id_product))
 			die(Tools::displayError());
@@ -1250,41 +1359,53 @@ class		Product extends ObjectModel
 		'.($id_product_attribute ? 'LEFT JOIN `'._DB_PREFIX_.'product_attribute` pa ON pa.`id_product_attribute` = '.intval($id_product_attribute) : '').'
 		LEFT JOIN `'._DB_PREFIX_.'tax` AS t ON t.`id_tax` = p.`id_tax`
 		WHERE p.`id_product` = '.intval($id_product));
-		$price = $result['price'];
+		$price = Tools::convertPrice(floatval($result['price']));
 
 		// Exclude tax
-		$tax = floatval(Tax::getApplicableTax(intval($result['id_tax']), floatval($result['rate'])));
+		$tax = floatval(Tax::getApplicableTax(intval($result['id_tax']), floatval($result['rate']), ($id_address_delivery ? intval($id_address_delivery) : NULL)));
 		if ($forceAssociatedTax)
 			$tax = floatval($result['rate']);
 		if (Tax::excludeTaxeOption() OR !$tax)
 			$usetax = false;
 		if ($usetax)
-			$price *= (1 + ($tax / 100));
+			$price = $price * (1 + ($tax / 100));
 
 		// Attribute price
-		$attribute_price = $usetax ? $result['attribute_price'] : ($result['attribute_price'] / (1 + (($tax ? $tax : $result['rate']) / 100)));
-		if (isset($result['attribute_price']))
-			$price += $attribute_price;
-		$reduc = self::getReductionValue($result['reduction_price'], $result['reduction_percent'], $result['reduction_from'], $result['reduction_to'],
-				$price, $usetax, floatval($result['rate']));
+		$attribute_price = Tools::convertPrice(array_key_exists('attribute_price', $result) ? floatval($result['attribute_price']) : 0);
+		$attribute_price = $usetax ? Tools::ps_round($attribute_price, 2) : ($attribute_price / (1 + (($tax ? $tax : $result['rate']) / 100)));
+		$price += $attribute_price;
+		if ($only_reduc OR $usereduc)
+			$reduc = self::getReductionValue($result['reduction_price'], $result['reduction_percent'], $result['reduction_from'], $result['reduction_to'], $price, $usetax, floatval($result['rate']));
 
 		// Only reduction
 		if ($only_reduc)
 			return $reduc;
-		
+
 		// Reduction
 		if ($usereduc)
 			$price -= $reduc;
 
 		// Quantity discount
+		if (intval($id_cart))
+		{
+			$totalQuantity = intval(Db::getInstance()->getValue('
+				SELECT SUM(`quantity`)
+				FROM `'._DB_PREFIX_.'cart_product`
+				WHERE `id_product` = '.intval($id_product).' AND `id_cart` = '.intval($cookie->id_cart))
+			) + intval($quantity);
+		}
 		if ($quantity > 1 AND ($qtyD = QuantityDiscount::getDiscountFromQuantity($id_product, $quantity)))
-			$price -= QuantityDiscount::getValue($price, $qtyD->id_discount_type, $qtyD->value);
-
+		{
+			$discount_qty_price = QuantityDiscount::getValue($price, $qtyD->id_discount_type, $qtyD->value);
+			$price -= $discount_qty_price;
+		}
 		// Group reduction
 		if ($id_customer)
-			$price *= ((100 - Group::getReduction($id_customer))/100);
-
-		self::$_prices[$cacheId] = ($divisor AND $divisor != 'NULL') ? number_format($price/$divisor, $decimals, '.', '') : number_format($price, $decimals, '.', '');
+			$price *= ((100 - Group::getReduction($id_customer)) / 100);
+		$price = ($divisor AND $divisor != NULL) ? $price/$divisor : $price;
+		if ($quantity <= 1 OR !$qtyD)
+			$price = Tools::ps_round($price, $decimals);
+		self::$_prices[$cacheId] = $price;
 		return self::$_prices[$cacheId];
 	}
 
@@ -1300,7 +1421,7 @@ class		Product extends ObjectModel
 	*/
 	public function getPrice($tax = true, $id_product_attribute = NULL, $decimals = 6, $divisor = NULL, $only_reduc = false, $usereduc = true, $quantity = 1)
 	{
-			return self::getPriceStatic(intval($this->id), $tax, $id_product_attribute, $decimals, $divisor, $only_reduc, $usereduc, $quantity);
+		return self::getPriceStatic(intval($this->id), $tax, $id_product_attribute, $decimals, $divisor, $only_reduc, $usereduc, $quantity);
 	}
 
 	public function getPriceWithoutReduct($notax = false)
@@ -1314,8 +1435,8 @@ class		Product extends ObjectModel
 			return false;
 		$tax = floatval(Tax::getApplicableTax(intval($res['id_tax']), floatval($res['rate'])));
 		if (!Tax::excludeTaxeOption() || $notax)
-			return ($res['price'] * (1 + $tax / 100));
-		return ($res['price']);
+			return (Tools::convertPrice($res['price']) * (1 + $tax / 100));
+		return (Tools::convertPrice($res['price']));
 	}
 
 	/**
@@ -1410,7 +1531,7 @@ class		Product extends ObjectModel
 		if (self::isAvailableWhenOutOfStock($product['out_of_stock']) AND intval($result['quantity']) == 0)
 			return -1;
 
-		if ($result['quantity'] < $product['quantity'])
+		if ($result['quantity'] < $product['cart_quantity'])
 		{
 			Db::getInstance()->Execute('
 			UPDATE `'._DB_PREFIX_.($product['id_product_attribute'] ? 'product_attribute' : 'product').'`
@@ -1422,7 +1543,7 @@ class		Product extends ObjectModel
 
 		Db::getInstance()->Execute('
 		UPDATE `'._DB_PREFIX_.'product'.($product['id_product_attribute'] ? '_attribute' : '').'`
-		SET `quantity` = `quantity`-'.intval($product['quantity']).'
+		SET `quantity` = `quantity`-'.intval($product['cart_quantity']).'
 		WHERE `id_product` = '.intval($product['id_product']).
 		($product['id_product_attribute'] ? ' AND `id_product_attribute` = '.intval($product['id_product_attribute']) : ''));
 		return true;
@@ -1506,7 +1627,7 @@ class		Product extends ObjectModel
 	public function getAttributesGroups($id_lang)
 	{
 		return Db::getInstance()->ExecuteS('
-		SELECT ag.`id_attribute_group`, agl.`name` AS group_name, agl.`public_name` AS public_group_name, a.`id_attribute`, al.`name` AS attribute_name,
+		SELECT ag.`id_attribute_group`, ag.`is_color_group`, agl.`name` AS group_name, agl.`public_name` AS public_group_name, a.`id_attribute`, al.`name` AS attribute_name,
 		a.`color` AS attribute_color, pa.`id_product_attribute`, pa.`quantity`, pa.`price`, pa.`ecotax`, pa.`weight`, pa.`default_on`, pa.`reference`
 		FROM `'._DB_PREFIX_.'product_attribute` pa
 		LEFT JOIN `'._DB_PREFIX_.'product_attribute_combination` pac ON pac.`id_product_attribute` = pa.`id_product_attribute`
@@ -1517,7 +1638,7 @@ class		Product extends ObjectModel
 		WHERE pa.`id_product` = '.intval($this->id).'
 		AND al.`id_lang` = '.intval($id_lang).'
 		AND agl.`id_lang` = '.intval($id_lang).'
-		ORDER BY pa.`id_product_attribute`');
+		ORDER BY agl.`name`');
 	}
 
 	/**
@@ -1527,7 +1648,7 @@ class		Product extends ObjectModel
 	*/
 	public function deleteAccessories()
 	{
-		return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'accessory` WHERE `id_product_1` = '.intval($this->id));
+		return Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'accessory` WHERE `id_product_1` = '.intval($this->id)) AND Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'accessory` WHERE `id_product_2` = '.intval($this->id));
 	}
 
 	/**
@@ -1923,7 +2044,7 @@ class		Product extends ObjectModel
 	}
 
 	private static $producPropertiesCache = array();
-	
+
 	static public function getProductProperties($id_lang, $row)
 	{
 		if (!$row['id_product'])
@@ -1950,10 +2071,16 @@ class		Product extends ObjectModel
 		$row['category'] = Category::getLinkRewrite($row['id_category_default'], intval($id_lang));
 		$row['link'] = $link->getProductLink($row['id_product'], $row['link_rewrite'], $row['category'], $row['ean13']);
 		$row['attribute_price'] = isset($row['id_product_attribute']) AND $row['id_product_attribute'] ? floatval(Product::getProductAttributePrice($row['id_product_attribute'])) : 0;
-		$row['price_tax_exc'] = Product::getPriceStatic($row['id_product'], false, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : NULL), 2);
-		$row['price'] = Product::getPriceStatic($row['id_product'], true, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : NULL), 2);
+		$row['price_tax_exc'] = Product::getPriceStatic($row['id_product'], false, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : NULL), 6);
+		if (self::$_taxCalculationMethod == PS_TAX_EXC)
+		{
+			$row['price_tax_exc'] = Tools::ps_round($row['price_tax_exc'], 2);
+			$row['price'] = Product::getPriceStatic($row['id_product'], true, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : 	NULL), 6);
+		}
+		else
+			$row['price'] = Tools::ps_round(Product::getPriceStatic($row['id_product'], true, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : NULL), 6), 2);
 		$row['reduction'] = self::getReductionValue($row['reduction_price'], $row['reduction_percent'], $row['reduction_from'], $row['reduction_to'], $row['price'], $usetax, floatval($row['rate']));
-		$row['price_without_reduction'] = Product::getPriceStatic($row['id_product'], true, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : NULL), 2, NULL, false, false);
+		$row['price_without_reduction'] = Product::getPriceStatic($row['id_product'], true, ((isset($row['id_product_attribute']) AND !empty($row['id_product_attribute'])) ? intval($row['id_product_attribute']) : NULL), 6, NULL, false, false);
 		$row['quantity'] = Product::getQuantity($row['id_product']);
 		$row['id_image'] = Product::defineProductImage($row);
 		$row['features'] = Product::getFrontFeaturesStatic(intval($id_lang), $row['id_product']);

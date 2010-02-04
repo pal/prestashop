@@ -124,7 +124,7 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 		{if count($images) > 3}<a id="view_scroll_right" title="{l s='Other views'}" href="javascript:{ldelim}{rdelim}">{l s='Next'}</a>{/if}
 		</div>
 		{/if}
-		{if count($images) > 1}<p class="align_center clear"><a id="resetImages" href="{$link->getProductLink($product)}" onclick="return (false);">{l s='Display all pictures'}</a></p>{/if}
+		{if count($images) > 1}<p class="align_center clear"><a id="resetImages" href="{$link->getProductLink($product)}" style="display:none;" onclick="$('a#resetImages').hide('slow');return (false);">{l s='Display all pictures'}</a></p>{/if}
 		<!-- usefull links-->
 		<ul id="usefull_link_block">
 			{if $HOOK_EXTRA_LEFT}{$HOOK_EXTRA_LEFT}{/if}
@@ -164,10 +164,10 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 			<div class="clear"></div>
 			<ul id="color_to_pick_list">
 			{foreach from=$colors key='id_attribute' item='color'}
-				<li><a id="color_{$id_attribute|intval}" class="color_pick" style="background: {$color.value};" onclick="updateColorSelect({$id_attribute|intval});">{if file_exists($col_img_dir|cat:$id_attribute|cat:'.jpg')}<img src="{$img_col_dir}{$id_attribute}.jpg" alt="" title="{$color.name}" />{/if}</a></li>
+				<li><a id="color_{$id_attribute|intval}" class="color_pick" style="background: {$color.value};" onclick="updateColorSelect({$id_attribute|intval});$('#resetImages').show('slow');">{if file_exists($col_img_dir|cat:$id_attribute|cat:'.jpg')}<img src="{$img_col_dir}{$id_attribute}.jpg" alt="" title="{$color.name}" />{/if}</a></li>
 			{/foreach}
 			</ul>
-				<a id="color_all" onclick="updateColorSelect(0);"><img src="{$img_dir}icon/cancel.gif" alt="" title="{$color.name}" /></a>
+				<a id="color_all" onclick="updateColorSelect(0);$('a#resetImages').hide('slow');"><img src="{$img_dir}icon/cancel.gif" alt="" title="{$color.name}" /></a>
 			<div class="clear"></div>
 		</div>
 		{/if}
@@ -194,17 +194,17 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 				<br />
 				<span class="our_price_display">
 				{if !$priceDisplay || $priceDisplay == 2}
-					<span id="our_price_display">{convertPrice price=$product->getPrice(true, $smarty.const.NULL, 2)}</span>
+					<span id="our_price_display">{convertPrice price=$product->getPrice(true, $smarty.const.NULL)}</span>
 						{l s='tax incl.'}
 				{/if}
 				{if $priceDisplay == 1}
-					<span id="our_price_display">{convertPrice price=$product->getPrice(false, $smarty.const.NULL, 2)}</span>
+					<span id="our_price_display">{convertPrice price=$product->getPrice(false, $smarty.const.NULL)}</span>
 						{l s='tax excl.'}
 				{/if}
 				</span>
 				{if $priceDisplay == 2}
 					<br />
-					<span id="pretaxe_price"><span id="pretaxe_price_display">{convertPrice price=$product->getPrice(false, $smarty.const.NULL, 2)}</span>&nbsp;{l s='tax excl.'}</span>
+					<span id="pretaxe_price"><span id="pretaxe_price_display">{convertPrice price=$product->getPrice(false, $smarty.const.NULL)}</span>&nbsp;{l s='tax excl.'}</span>
 				{/if}
 				<br />
 			</p>
@@ -240,7 +240,7 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 			<p>
 				<label for="group_{$id_attribute_group|intval}">{$group.name|escape:'htmlall':'UTF-8'} :</label>
 				{assign var='groupName' value='group_'|cat:$id_attribute_group}
-				<select name="{$groupName}" id="group_{$id_attribute_group|intval}" onchange="javascript:findCombination();">
+				<select name="{$groupName}" id="group_{$id_attribute_group|intval}" onchange="javascript:findCombination();{if $group.is_color_group}$('#resetImages').show('slow');{/if}">
 					{foreach from=$group.attributes key=id_attribute item=group_attribute}
 						<option value="{$id_attribute|intval}"{if (isset($smarty.get.$groupName) && $smarty.get.$groupName|intval == $id_attribute) || $group.default == $id_attribute} selected="selected"{/if}>{$group_attribute|escape:'htmlall':'UTF-8'}</option>
 					{/foreach}
@@ -259,7 +259,7 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 			</p>
 
 			<!-- availability -->
-			<p id="availability_statut"{if ($allow_oosp && $product->quantity == 0 && !$product->available_later) || (!$product->available_now && $display_qties != 1) } style="display:none;"{/if}>
+			<p id="availability_statut"{if $allow_oosp && (($product->quantity == 0 && !$product->available_later) || (!$product->available_now && $display_qties != 1))} style="display:none;"{/if}>
 				<span id="availability_label">{l s='Availability:'}</span>
 				<span id="availability_value"{if $product->quantity == 0} class="warning-inline"{/if}>
 					{if $product->quantity == 0}{if $allow_oosp}{$product->available_later}{else}{l s='This product is no longer in stock'}{/if}{else}{$product->available_now}{/if}

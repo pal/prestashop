@@ -42,6 +42,8 @@ require_once(_PS_INSTALLER_PHP_UPGRADE_DIR_.'reorderpositions.php');
 require_once(_PS_INSTALLER_PHP_UPGRADE_DIR_.'updatemodulessql.php');
 // Clean carrier URL
 require_once(_PS_INSTALLER_PHP_UPGRADE_DIR_.'updatecarrierurl.php');
+// Convert prices to the new 1.3 rounding system
+require_once(_PS_INSTALLER_PHP_UPGRADE_DIR_.'price_converter.php');
 
 //old version detection
 $oldversion = false;
@@ -61,7 +63,7 @@ elseif ($versionCompare === false)
 	die('<action result="fail" error="29" />'."\n");
 
 //check DB access
-include(INSTALL_PATH.'/classes/ToolsInstall.php');
+include_once(INSTALL_PATH.'/classes/ToolsInstall.php');
 $resultDB = ToolsInstall::checkDB(_DB_SERVER_, _DB_USER_, _DB_PASSWD_, _DB_NAME_, false);
 if ($resultDB !== true)
 	die("<action result='fail' error='".$resultDB."'/>\n");

@@ -41,6 +41,10 @@ class AdminBackup extends AdminTab
 			'filename' => array('title' => $this->l('Filename'), 'width' => 200),
 			'filesize' => array('title' => $this->l('File size')),
 		);
+		$this->optionTitle = $this->l('Backup option');
+		$this->_fieldsOptions = array(
+			'PS_BACKUP_ALL' => array('title' => $this->l('Backup all tables:'), 'desc' => $this->l('If you disable this option, only the necessary tables will be imported (connections and statistics will not be imported)'), 'cast' => 'intval', 'type' => 'bool')
+		);
 
 		$this->identifier = 'filename';
 	}
@@ -49,7 +53,7 @@ class AdminBackup extends AdminTab
 	 * Load class object using identifier in $_GET (if possible)
 	 * otherwise return an empty object
 	 * This method overrides the one in AdminTab because AdminTab assumes the id is a UnsignedInt
-	 *
+	 *dir backups on admin dir must be writable (CHMOD 777)
 	 * @param boolean $opt Return an empty object if load fail
 	 * @return object
 	 */
@@ -65,16 +69,21 @@ class AdminBackup extends AdminTab
 	 */
 	public function displayForm()
 	{
-		$object = $this->loadObject();
-		if ($object->add())
+		if(is_writable(PS_ADMIN_DIR.'/backups/'))
 		{
-			echo '<div class="conf confirm"><img src="../img/admin/ok.gif" />&nbsp;'.$this->l('Back-up Creation successful').' !</div>';
-			if ($this->tabAccess['view'] === '1')
-				echo '<br />'.$this->l('You can now').' <b><a href="'.$object->getBackupURL().'">'.$this->l('download the back-up file').'</a></b>.';
-			echo '<br />';
+			$object = $this->loadObject();
+			if ($object->add())
+			{
+				echo '<div class="conf confirm"><img src="../img/admin/ok.gif" />&nbsp;'.$this->l('Back-up Creation successful').' !</div>';
+				if ($this->tabAccess['view'] === '1')
+					echo '<br />'.$this->l('You can now').' <b><a href="'.$object->getBackupURL().'">'.$this->l('download the back-up file').'</a></b>.';
+				echo '<br />';
+			}
+			elseif ($object->error)
+				$this->_errors[] = $object->error;
 		}
-		elseif ($object->error)
-			$this->_errors[] = $object->error;
+		else
+			$this->_errors[] = $this->l('dir backups on admin dir must be writable (CHMOD 777)');
 		$this->displayErrors();
 	}
 
@@ -103,6 +112,10 @@ class AdminBackup extends AdminTab
 	public function displayList()
 	{
 		global $currentIndex;
+
+		// Test if the backup dir is writable
+		if(!is_writable(PS_ADMIN_DIR.'/backups/'))
+			$this->displayWarning($this->l('dir backups on admin dir must be writable (CHMOD 777)'));
 
 		$this->displayErrors();
 		echo '<br /><a href="'.$currentIndex.'&add'.$this->table.'&token='.$this->token.'"><img src="../img/admin/add.gif" border="0" /> '.$this->l('Create new back-up').'</a><br /><br />';
@@ -214,17 +227,6 @@ class AdminBackup extends AdminTab
 		}
 		usort($this->_list, array($this, $sorter));
 		$this->_list = array_slice($this->_list, $start, $limit);
-	}
-	
-
-	public function displayErrors()
-	{
-		static $seenErrors = false;
-		if (!$seenErrors)
-		{
-			$seenErrors = true;
-			parent::displayErrors();
-		}
 	}
 	
 	public function int_sort($a, $b)

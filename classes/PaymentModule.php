@@ -103,13 +103,14 @@ abstract class PaymentModule extends Module
 			$order->gift = intval($cart->gift);
 			$order->gift_message = $cart->gift_message;
 			$currency = new Currency($order->id_currency);
-			$amountPaid = !$dont_touch_amount ? floatval(Tools::convertPrice(floatval(number_format($amountPaid, 2, '.', '')), $currency)) : $amountPaid;
+			$amountPaid = !$dont_touch_amount ? Tools::ps_round(floatval($amountPaid), 2) : $amountPaid;
 			$order->total_paid_real = $amountPaid;
-			$order->total_products = floatval(Tools::convertPrice(floatval(number_format($cart->getOrderTotal(false, 1), 2, '.', '')), $currency));
-			$order->total_discounts = floatval(Tools::convertPrice(floatval(number_format(abs($cart->getOrderTotal(true, 2)), 2, '.', '')), $currency));
-			$order->total_shipping = floatval(Tools::convertPrice(floatval(number_format($cart->getOrderShippingCost(), 2, '.', '')), $currency));
-			$order->total_wrapping = floatval(Tools::convertPrice(floatval(number_format(abs($cart->getOrderTotal(true, 6)), 2, '.', '')), $currency));
-			$order->total_paid = floatval(Tools::convertPrice(floatval(number_format($cart->getOrderTotal(true, 3), 2, '.', '')), $currency));
+			$order->total_products = floatval($cart->getOrderTotal(false, 1));
+			$order->total_products_wt = floatval($cart->getOrderTotal(true, 1));
+			$order->total_discounts = floatval(abs($cart->getOrderTotal(true, 2)));
+			$order->total_shipping = floatval($cart->getOrderShippingCost());
+			$order->total_wrapping = floatval(abs($cart->getOrderTotal(true, 6)));
+			$order->total_paid = floatval(Tools::ps_round(floatval($cart->getOrderTotal(true, 3)), 2));
 			// Amount paid by customer is not the right one -> Status = payment error
 			if ($order->total_paid != $order->total_paid_real)
 				$id_order_state = _PS_OS_ERROR_;
@@ -141,7 +142,7 @@ abstract class PaymentModule extends Module
 				$productsList = '';
 				$db = Db::getInstance();
 				$query = 'INSERT INTO `'._DB_PREFIX_.'order_detail`
-					(`id_order`, `product_id`, `product_attribute_id`, `product_name`, `product_quantity`, `product_quantity_in_stock`, `product_price`, `product_quantity_discount`, `product_ean13`, `product_reference`, `product_supplier_reference`, `product_weight`, `tax_name`, `tax_rate`, `ecotax`, `download_deadline`, `download_hash`)
+					(`id_order`, `product_id`, `product_attribute_id`, `product_name`, `product_quantity`, `product_quantity_in_stock`, `product_price`, `product_quantity_discount`, `product_ean13`, `product_reference`, `product_supplier_reference`, `product_weight`, `tax_name`, `tax_rate`, `ecotax`, `discount_quantity_applied`, `download_deadline`, `download_hash`)
 				VALUES ';
 
 				$customizedDatas = Product::getAllCustomizedDatas(intval($order->id_cart));
@@ -149,21 +150,15 @@ abstract class PaymentModule extends Module
 				foreach ($products AS $key => $product)
 				{
 					$productQuantity = intval(Product::getQuantity(intval($product['id_product']), ($product['id_product_attribute'] ? intval($product['id_product_attribute']) : NULL)));
-					$quantityInStock = ($productQuantity - intval($product['quantity']) < 0) ? $productQuantity : intval($product['quantity']);
+					$quantityInStock = ($productQuantity - intval($product['cart_quantity']) < 0) ? $productQuantity : intval($product['cart_quantity']);
 					if ($id_order_state != _PS_OS_CANCELED_ AND $id_order_state != _PS_OS_ERROR_)
 					{
-						if ($id_order_state != _PS_OS_OUTOFSTOCK_ AND (($updateResult = Product::updateQuantity($product)) === false OR $updateResult === -1))
-							{
-								$id_order_state = _PS_OS_OUTOFSTOCK_;
-								$history = new OrderHistory();
-								$history->id_order = intval($order->id);
-								$history->changeIdOrderState(_PS_OS_OUTOFSTOCK_, intval($order->id));
-								$history->addWithemail();
-							}
+						if ((($updateResult = Product::updateQuantity($product)) === false OR $updateResult === -1))
+							$outOfStock = true;
 						Hook::updateQuantity($product, $order);
 					}
-					$price = Tools::convertPrice(Product::getPriceStatic(intval($product['id_product']), false, ($product['id_product_attribute'] ? intval($product['id_product_attribute']) : NULL), 6, NULL, false, true, $product['quantity']), $currency);
-					$price_wt = Tools::convertPrice(Product::getPriceStatic(intval($product['id_product']), true, ($product['id_product_attribute'] ? intval($product['id_product_attribute']) : NULL), 6, NULL, false, true, $product['quantity']), $currency);
+					$price = Product::getPriceStatic(intval($product['id_product']), false, ($product['id_product_attribute'] ? intval($product['id_product_attribute']) : NULL), 6, NULL, false, true, $product['cart_quantity'], false, intval($order->id_customer), intval($order->id_cart), intval($order->id_address_delivery));
+					$price_wt = Product::getPriceStatic(intval($product['id_product']), true, ($product['id_product_attribute'] ? intval($product['id_product_attribute']) : NULL), 2, NULL, false, true, $product['cart_quantity'], false, intval($order->id_customer), intval($order->id_cart), intval($order->id_address_delivery));
 
 					// Add some informations for virtual products
 					$deadline = '0000-00-00 00:00:00';
@@ -183,11 +178,11 @@ abstract class PaymentModule extends Module
 						$product['rate'] = 0;
 					}
 					else
-						$tax = Tax::getApplicableTax(intval($product['id_tax']), floatval($product['rate']));
+						$tax = Tax::getApplicableTax(intval($product['id_tax']), floatval($product['rate']), intval($order->id_address_delivery));
 
 					// Quantity discount
 					$reduc = 0.0;
-					if ($product['quantity'] > 1 AND ($qtyD = QuantityDiscount::getDiscountFromQuantity($product['id_product'], $product['quantity'])))
+					if ($product['cart_quantity'] > 1 AND ($qtyD = QuantityDiscount::getDiscountFromQuantity($product['id_product'], $product['cart_quantity'])))
 						$reduc = QuantityDiscount::getValue($price_wt, $qtyD->id_discount_type, $qtyD->value);
 
 					// Query
@@ -195,17 +190,18 @@ abstract class PaymentModule extends Module
 						'.intval($product['id_product']).',
 						'.(isset($product['id_product_attribute']) ? intval($product['id_product_attribute']) : 'NULL').',
 						\''.pSQL($product['name'].((isset($product['attributes']) AND $product['attributes'] != NULL) ? ' - '.$product['attributes'] : '')).'\',
-						'.intval($product['quantity']).',
+						'.intval($product['cart_quantity']).',
 						'.$quantityInStock.',
 						'.floatval($price).',
 						'.floatval($reduc).',
 						'.(empty($product['ean13']) ? 'NULL' : '\''.pSQL($product['ean13']).'\'').',
 						'.(empty($product['reference']) ? 'NULL' : '\''.pSQL($product['reference']).'\'').',
 						'.(empty($product['supplier_reference']) ? 'NULL' : '\''.pSQL($product['supplier_reference']).'\'').',
-						'.floatval(array_key_exists('id_product_attribute', $product) ? $product['weight_attribute'] : $product['weight']).',
+						'.floatval($product['id_product_attribute'] ? $product['weight_attribute'] : $product['weight']).',
 						\''.(!$tax ? '' : pSQL($product['tax'])).'\',
 						'.floatval($tax).',
 						'.floatval($product['ecotax']).',
+						'.(int)QuantityDiscount::getDiscountFromQuantity(intval($product['id_product']), intval($product['cart_quantity'])).',
 						\''.pSQL($deadline).'\',
 						\''.pSQL($download_hash).'\'),';
 
@@ -218,7 +214,7 @@ abstract class PaymentModule extends Module
 						'<tr style="background-color:'.($key%2 ? '#DDE2E6' : '#EBECEE').';">
 							<td style="padding:0.6em 0.4em;">'.$product['reference'].'</td>
 							<td style="padding:0.6em 0.4em;"><strong>'.$product['name'].(isset($product['attributes_small']) ? ' '.$product['attributes_small'] : '').' - '.$this->l('Customized').'</strong></td>
-							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice($price * ($tax + 100) / 100, $currency, false, false).'</td>
+							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice($price_wt, $currency, false, false).'</td>
 							<td style="padding:0.6em 0.4em; text-align:center;">'.$customizationQuantity.'</td>
 							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice($customizationQuantity * $priceWithTax, $currency, false, false).'</td>
 						</tr>';
@@ -229,9 +225,9 @@ abstract class PaymentModule extends Module
 						'<tr style="background-color:'.($key%2 ? '#DDE2E6' : '#EBECEE').';">
 							<td style="padding:0.6em 0.4em;">'.$product['reference'].'</td>
 							<td style="padding:0.6em 0.4em;"><strong>'.$product['name'].(isset($product['attributes_small']) ? ' '.$product['attributes_small'] : '').'</strong></td>
-							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice($price * ($tax + 100) / 100, $currency, false, false).'</td>
-							<td style="padding:0.6em 0.4em; text-align:center;">'.(intval($product['quantity']) - $customizationQuantity).'</td>
-							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice((intval($product['quantity']) - $customizationQuantity) * $priceWithTax, $currency, false, false).'</td>
+							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice($price_wt, $currency, false, false).'</td>
+							<td style="padding:0.6em 0.4em; text-align:center;">'.(intval($product['cart_quantity']) - $customizationQuantity).'</td>
+							<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice((intval($product['cart_quantity']) - $customizationQuantity) * $price_wt, $currency, false, false).'</td>
 						</tr>';
 				} // end foreach ($products)
 				$query = rtrim($query, ',');
@@ -251,8 +247,8 @@ abstract class PaymentModule extends Module
 
 					$discountsList .=
 					'<tr style="background-color:#EBECEE;">
-							<td colspan="4" style="padding:0.6em 0.4em; text-align:right;">'.$this->l('Voucher code:').' '.$objDiscount->name.'</td>
-							<td style="padding:0.6em 0.4em; text-align:right;">-'.Tools::displayPrice($value, $currency, false, false).'</td>
+							<td colspan="4" style="padding: 0.6em 0.4em; text-align: right;">'.$this->l('Voucher code:').' '.$objDiscount->name.'</td>
+							<td style="padding: 0.6em 0.4em; text-align: right;">-'.Tools::displayPrice($value, $currency, false, false).'</td>
 					</tr>';
 				}
 
@@ -272,17 +268,22 @@ abstract class PaymentModule extends Module
 					Hook::newOrder($cart, $order, $customer, $currency, $orderStatus);
 					foreach ($cart->getProducts() as $product)
 						if ($orderStatus->logable)
-							ProductSale::addProductSale($product['id_product'], $product['quantity']);
-				}
+							ProductSale::addProductSale(intval($product['id_product']), intval($product['cart_quantity']));
+				}				
 
-				// Set order state in order history ONLY if the "out of stock" status has not been yet reached
-				// If it has, a status changing has already been applied at that time
-				if ($id_order_state != _PS_OS_OUTOFSTOCK_)
+				// Set order state in order history ONLY even if the "out of stock" status has not been yet reached
+				// So you migth have two order states
+				$new_history = new OrderHistory();
+				$new_history->id_order = intval($order->id);
+				$new_history->changeIdOrderState(intval($id_order_state), intval($order->id));
+				$new_history->addWithemail(true, $extraVars);
+				
+				if (isset($outOfStock) AND $outOfStock)
 				{
-					$new_history = new OrderHistory();
-					$new_history->id_order = intval($order->id);
-					$new_history->changeIdOrderState(intval($id_order_state), intval($order->id));
-					$new_history->addWithemail(true, $extraVars);
+					$history = new OrderHistory();
+					$history->id_order = intval($order->id);
+					$history->changeIdOrderState(_PS_OS_OUTOFSTOCK_, intval($order->id));
+					$history->addWithemail();
 				}
 
 				// Send an e-mail to customer
@@ -294,45 +295,43 @@ abstract class PaymentModule extends Module
 					$delivery_state = $delivery->id_state ? new State(intval($delivery->id_state)) : false;
 					$invoice_state = $invoice->id_state ? new State(intval($invoice->id_state)) : false;
 
-					$data = array(
-					
-						'{firstname}' => $customer->firstname,
-						'{lastname}' => $customer->lastname,
-						'{email}' => $customer->email,
-						'{delivery_company}' => $delivery->company,
-						'{delivery_firstname}' => $delivery->firstname,
-						'{delivery_lastname}' => $delivery->lastname,
-						'{delivery_address1}' => $delivery->address1,
-						'{delivery_address2}' => $delivery->address2,
-						'{delivery_city}' => $delivery->city,
-						'{delivery_postal_code}' => $delivery->postcode,
-						'{delivery_country}' => $delivery->country,
-						'{delivery_state}' => $delivery->id_state ? $delivery_state->name : '',
-						'{delivery_phone}' => $delivery->phone,
-						'{delivery_other}' => $delivery->other,
-						'{invoice_company}' => $invoice->company,
-						'{invoice_firstname}' => $invoice->firstname,
-						'{invoice_lastname}' => $invoice->lastname,
-						'{invoice_address2}' => $invoice->address2,
-						'{invoice_address1}' => $invoice->address1,
-						'{invoice_city}' => $invoice->city,
-						'{invoice_postal_code}' => $invoice->postcode,
-						'{invoice_country}' => $invoice->country,
-						'{invoice_state}' => $invoice->id_state ? $invoice_state->name : '',
-						'{invoice_phone}' => $invoice->phone,
-						'{invoice_other}' => $invoice->other,
-						'{order_name}' => sprintf("#%06d", intval($order->id)),
-						'{date}' => Tools::displayDate(date('Y-m-d H:i:s'), intval($order->id_lang), 1),
-						'{carrier}' => (strval($carrier->name) != '0' ? $carrier->name : Configuration::get('PS_SHOP_NAME')),
-						'{payment}' => $order->payment,
-						'{products}' => $productsList,
-						'{discounts}' => $discountsList,
-						'{total_paid}' => Tools::displayPrice($order->total_paid, $currency, false, false),
-						'{total_products}' => Tools::displayPrice($order->total_paid - $order->total_shipping - $order->total_wrapping+ $order->total_discounts, $currency, false, false),
-						'{total_discounts}' => Tools::displayPrice($order->total_discounts, $currency, false, false),
-						'{total_shipping}' => Tools::displayPrice($order->total_shipping, $currency, false, false),
-						'{total_wrapping}' => Tools::displayPrice($order->total_wrapping, $currency, false, false)
-					);
+					$data = array(					
+					'{firstname}' => $customer->firstname,
+					'{lastname}' => $customer->lastname,
+					'{email}' => $customer->email,
+					'{delivery_company}' => $delivery->company,
+					'{delivery_firstname}' => $delivery->firstname,
+					'{delivery_lastname}' => $delivery->lastname,
+					'{delivery_address1}' => $delivery->address1,
+					'{delivery_address2}' => $delivery->address2,
+					'{delivery_city}' => $delivery->city,
+					'{delivery_postal_code}' => $delivery->postcode,
+					'{delivery_country}' => $delivery->country,
+					'{delivery_state}' => $delivery->id_state ? $delivery_state->name : '',
+					'{delivery_phone}' => $delivery->phone,
+					'{delivery_other}' => $delivery->other,
+					'{invoice_company}' => $invoice->company,
+					'{invoice_firstname}' => $invoice->firstname,
+					'{invoice_lastname}' => $invoice->lastname,
+					'{invoice_address2}' => $invoice->address2,
+					'{invoice_address1}' => $invoice->address1,
+					'{invoice_city}' => $invoice->city,
+					'{invoice_postal_code}' => $invoice->postcode,
+					'{invoice_country}' => $invoice->country,
+					'{invoice_state}' => $invoice->id_state ? $invoice_state->name : '',
+					'{invoice_phone}' => $invoice->phone,
+					'{invoice_other}' => $invoice->other,
+					'{order_name}' => sprintf("#%06d", intval($order->id)),
+					'{date}' => Tools::displayDate(date('Y-m-d H:i:s'), intval($order->id_lang), 1),
+					'{carrier}' => (strval($carrier->name) != '0' ? $carrier->name : Configuration::get('PS_SHOP_NAME')),
+					'{payment}' => $order->payment,
+					'{products}' => $productsList,
+					'{discounts}' => $discountsList,
+					'{total_paid}' => Tools::displayPrice($order->total_paid, $currency, false, false),
+					'{total_products}' => Tools::displayPrice($order->total_paid - $order->total_shipping - $order->total_wrapping + $order->total_discounts, $currency, false, false),
+					'{total_discounts}' => Tools::displayPrice($order->total_discounts, $currency, false, false),
+					'{total_shipping}' => Tools::displayPrice($order->total_shipping, $currency, false, false),
+					'{total_wrapping}' => Tools::displayPrice($order->total_wrapping, $currency, false, false));
 					
 					if (is_array($extraVars))
 						$data = array_merge($data, $extraVars);
@@ -352,6 +351,7 @@ abstract class PaymentModule extends Module
 					$this->currentOrder = intval($order->id);
 					return true;
 				}
+				$this->currentOrder = intval($order->id);
 				return true;
 			}
 			else

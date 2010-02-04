@@ -148,8 +148,8 @@ class AdminShipping extends AdminTab
 			<label class="clear">'.$confKey['title'].':</label>
 			<div class="margin-form">';
 			echo $sign_left;
-			echo '<input size="5" type="text" name="'.$key.'" value="'.(($postValue != false OR (string)$postValue == '0') ? $postValue : $confValues[$key]).'" />';
-			echo $sign_right;
+			echo '<input size="6" type="text" name="'.$key.'" value="'.(($postValue != false OR (string)$postValue == '0') ? $postValue : $confValues[$key]).'" />';
+			echo $sign_right.' '.($key == 'PS_SHIPPING_HANDLING' ? $this->l('(tax excl.)') : '');
 			echo '</div>';
 		}
 
@@ -240,6 +240,7 @@ class AdminShipping extends AdminTab
 					</tr>';
 				echo '
 				</table>
+				<p>'.$this->l('Prices are tax excluded.').'</p>
 			</fieldset>
 			<input type="hidden" name="id_carrier" value="'.$id_carrier.'" />
 		</form>';

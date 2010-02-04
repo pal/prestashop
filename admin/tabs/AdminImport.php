@@ -222,7 +222,7 @@ class AdminImport extends AdminTab
 				
 				self::$default_values = array(
 				'alias' => 'Alias',	
-				'postcode' => 'X',			
+				'postcode' => 'X',			trunk/img/tmp/product_mini_9.jpg
 				);				
 								
 			break;			
@@ -672,6 +672,9 @@ class AdminImport extends AdminTab
 			$langFieldError = $product->validateFieldsLang(UNFRIENDLY_ERROR, true);
 			if ($fieldError === true AND $langFieldError === true)
 			{
+				// check quantity
+				if ($product->quantity == NULL)
+					$product->quantity = 0; 
 				// If id product AND id product already in base, trying to update
 				if ($product->id AND Product::existsInDatabase(intval($product->id)))
 				{
@@ -825,7 +828,7 @@ class AdminImport extends AdminTab
 			if (!$res)
 			{
 				$this->_errors[] = $info['email'].(isset($info['id']) ? ' (ID '.$info['id'].')' : '').' '.Tools::displayError('cannot be saved');
-				$this->_errors[] = ($fieldError !== true ? $fieldError : '').($langFieldError !== true ? $langFieldError : '').mysql_error();
+				$this->_errors[] = ($fieldError !== true ? $fieldError : ($langFieldError !== true ? $langFieldError : '')).mysql_error();
 			}
 		}
 		$this->closeCsvFile($handle);
@@ -1032,6 +1035,9 @@ class AdminImport extends AdminTab
 
 		if ((Tools::getValue('import')))
 			echo '<div class="module_confirmation conf confirm"><img src="../img/admin/ok.gif" alt="" title="" style="margin-right:5px; float:left;" />'.$this->l('The .CSV file has been imported into your shop.').'</div>';
+		
+		if(!is_writable(PS_ADMIN_DIR.'/import/'))
+			$this->displayWarning($this->l('dir import on admin dir must be writable (CHMOD 777)'));
 		
 		if(isset($this->_warnings) AND sizeof($this->_warnings))
 		{

@@ -1,7 +1,5 @@
 <?php
 
-ini_set('display_errors', 'on');
-
 class Followup extends Module
 {
 	function __construct()
@@ -33,7 +31,7 @@ class Followup extends Module
 		`id_email_type` INT UNSIGNED NOT NULL ,
 		`id_discount` INT UNSIGNED NOT NULL ,
 		`id_customer` INT UNSIGNED NULL ,
-		`id_cart` INT UNSIGNED NULL ,		
+		`id_cart` INT UNSIGNED NULL ,
 		`date_add` DATETIME NOT NULL
 		) ENGINE = MYISAM');
 		
@@ -78,12 +76,12 @@ class Followup extends Module
 		
 		echo '
 		<h2>'.$this->l('Customers follow-up').'</h2>
-		<form action="'.$_SERVER['REQUEST_URI'].'" method="post">			
+		<form action="'.$_SERVER['REQUEST_URI'].'" method="post">
 			<fieldset style="width: 400px; float: left;">
 				<legend><img src="'.$this->_path.'logo.gif" alt="" title="" />'.$this->l('Settings').'</legend>
 				<p>'.$this->l('Four kinds of e-mail alerts in order to stay in touch with your customers!').'<br /><br />
 				'.$this->l('Define settings and put this URL in crontab or call it manually daily:').'<br />
-				<b>http://'.$_SERVER['HTTP_HOST'].__PS_BASE_URI__.'modules/followup/cron.php?secure_key='.Configuration::get('PS_FOLLOWUP_SECURE_KEY').'</b></p>
+				<b>http://'.Tools::getHttpHost(false, true).__PS_BASE_URI__.'modules/followup/cron.php?secure_key='.Configuration::get('PS_FOLLOWUP_SECURE_KEY').'</b></p>
 				<hr size="1" />
 				<p><b>1. '.$this->l('Canceled carts').'</b><br /><br />'.$this->l('For each cancelled cart (with no order), generate a discount and send it to the customer').'</p>
 				<label>'.$this->l('Enable').'</label>
@@ -172,8 +170,8 @@ class Followup extends Module
 			WHERE l2.id_email_type = l.id_email_type AND l2.date_add = l.date_add AND od.id_order IS NOT NULL AND o.valid = 1) nb_used
 			FROM '._DB_PREFIX_.'log_email l
 			WHERE l.date_add >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-			GROUP BY l.date_add, l.id_email_type');
-			
+			GROUP BY DATE_FORMAT(l.date_add, \'%Y-%m-%d\'), l.id_email_type');
+
 			$statsArray = array();
 			foreach ($stats AS $stat)
 			{
@@ -199,13 +197,12 @@ class Followup extends Module
 			
 			if (!sizeof($statsArray))
 				echo '<tr><td colspan="13" style="font-weight: bold; text-align: center;">'.$this->l('No statistics yet').'</td></tr>';
-			
 			foreach ($statsArray AS $date_stat => $array)
 			{
 				$rates = array();
 				for ($i = 1; $i != 5; $i++)
 					if (isset($statsArray[$date_stat][$i]['nb']) AND isset($statsArray[$date_stat][$i]['nb_used']) AND $statsArray[$date_stat][$i]['nb_used'] > 0)
-						$rates[$i] = number_format(($statsArray[$date_stat][$i]['nb'] / $statsArray[$date_stat][$i]['nb_used'])*100, 2, '.', '');
+						$rates[$i] = number_format(($statsArray[$date_stat][$i]['nb_used'] / $statsArray[$date_stat][$i]['nb'])*100, 2, '.', '');
 				
 				echo '
 				<tr>

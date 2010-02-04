@@ -4,7 +4,7 @@ include_once(dirname(__FILE__).'/../../../config/config.inc.php');
 include_once(dirname(__FILE__).'/../../../init.php');
 
 include_once(_PS_MODULE_DIR_.'paypalapi/paypalapi.php');
-include_once(_PS_MODULE_DIR_.'paypalapi/express/PaypalExpress.php');
+include_once(_PS_MODULE_DIR_.'paypalapi/express/paypalexpress.php');
 
 $ppExpress = new PaypalExpress();
 $errors = array();
@@ -25,6 +25,7 @@ function getAuthorization()
 			if (isset($result['TOKEN']))
 			{
 				$cookie->paypal_token = strval($result['TOKEN']);
+				$cookie->paypal_token_date = time();
 				header('Location: https://'.$ppExpress->getPayPalURL().'/webscr&cmd=_express-checkout&token='.urldecode(strval($cookie->paypal_token)));
 			}
 			else
@@ -77,11 +78,13 @@ function displayConfirm()
 	include(_PS_ROOT_DIR_.'/header.php');
 
 	$smarty->assign(array(
+		'back' => 'paypalapi',
+		'logo' => $ppExpress->getLogo(),
 		'ppToken' => strval($cookie->paypal_token),
 		'cust_currency' => $cookie->id_currency,
 		'currencies' => $ppExpress->getCurrency(),
-		'total' => number_format($cart->getOrderTotal(true, 3), 2, '.', ''),
-		'this_path_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/'. $ppExpress->name.'/',
+		'total' => $cart->getOrderTotal(true, 3),
+		'this_path_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/'. $ppExpress->name.'/',
 		'payerID' => $payerID,
 		'mode' => 'express/'
 	));
@@ -279,9 +282,9 @@ function displayAccount()
 		'email' => $email,
 		'firstname' => (Tools::getValue('customer_firstname') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('customer_firstname'))) : $result['FIRSTNAME']),
 		'lastname' => (Tools::getValue('customer_lastname') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('customer_lastname'))) : $result['LASTNAME']),
-		'street' => (Tools::getValue('address1') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('address1'))) : $result['SHIPTOSTREET']),
-		'city' => (Tools::getValue('city') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('city'))) : $result['SHIPTOCITY']),
-		'zip' => (Tools::getValue('postcode') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('postcode'))) : $result['SHIPTOZIP']),
+		'street' => (Tools::getValue('address1') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('address1'))) : (isset($result['SHIPTOSTREET']) ? $result['SHIPTOSTREET'] : '')),
+		'city' => (Tools::getValue('city') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('city'))) : (isset($result['SHIPTOCITY']) ? $result['SHIPTOCITY'] : '')),
+		'zip' => (Tools::getValue('postcode') ? Tools::htmlentitiesUTF8(strval(Tools::getValue('postcode'))) : (isset($result['SHIPTOZIP']) ? $result['SHIPTOZIP'] : '')),
 		'payerID' => $payerID,
 		'ppToken' => strval($cookie->paypal_token),
 		'errors'=> $errors
@@ -315,6 +318,12 @@ else
 	// We got an error or we still not submit form
 	if ((!Tools::isSubmit('submitAccount') AND !Tools::isSubmit('submitLogin')) OR sizeof($errors))
 	{
+		if (isset($cookie->paypal_token) AND isset($cookie->paypal_token_date) AND (time() - 10800 > $cookie->paypal_token_date))
+		{
+			// Token expired, unset it
+			unset($cookie->paypal_token);
+			Tools::redirect('modules/paypalapi/express/submit.php');
+		}
 		//  We didn't submit form, getting PayPal informations
 		if (!Tools::isSubmit('submitAccount') AND !Tools::isSubmit('submitLogin'))
 			$result = getInfos();

@@ -1,0 +1,13 @@
+Hola {firstname} {lastname},
+
+Respecto al pedido #{id_order}:
+		
+Tu pedido ha sido cancelado.
+
+Puedes revisar este pedido y descargar tu factura desde la seccion de "Historial de Pedidos" dentro de tu cuenta en nuestra web. 
+
+{shop_name} - {shop_url}
+
+
+
+{shop_url} desarrollado por PrestaShop®

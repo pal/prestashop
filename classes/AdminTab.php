@@ -135,7 +135,7 @@ abstract class AdminTab
 		13 => $this->l('Module uninstalled successfully'), 14 => $this->l('Language successfully copied'),
 		15 => $this->l('Translations successfully added'), 16 => $this->l('Module transplanted successfully to hook'),
 		17 => $this->l('Module removed successfully from hook'), 18 => $this->l('Upload successful'),
-		19 => $this->l('Duplication successfully done'));
+		19 => $this->l('Duplication successfully done'), 20 => $this->l('Translation added successfully but the language has been not created'));
 		if (!$this->identifier) $this->identifier = 'id_'.$this->table;
 		if (!$this->_defaultOrderBy) $this->_defaultOrderBy = $this->identifier;
 		$this->token = Tools::getAdminToken(get_class($this).intval($this->id).intval($cookie->id_employee));
@@ -144,8 +144,15 @@ abstract class AdminTab
 	protected function l($string, $class = __CLASS__, $addslashes = FALSE, $htmlentities = TRUE)
 	{
 		global $_LANGADM;
+		
+		/* Disabled in 1.3a1 version for performance issues, however that case must not appen
+		
 		if (!is_array($_LANGADM))
+		{
 			return str_replace('"', '&quot;', $string);
+		}
+		*/
+		
 		$key = md5(str_replace('\'', '\\\'', $string));
 		$str = (key_exists(get_class($this).$key, $_LANGADM)) ? $_LANGADM[get_class($this).$key] : ((key_exists($class.$key, $_LANGADM)) ? $_LANGADM[$class.$key] : $string);
 		$str = $htmlentities ? htmlentities($str, ENT_QUOTES, 'utf-8') : $str;
@@ -652,6 +659,8 @@ abstract class AdminTab
 						$key = isset($tmpTab[1]) ? $tmpTab[0].'.`'.$tmpTab[1].'`' : '`'.$tmpTab[0].'`';
 						if (array_key_exists('tmpTableFilter', $field))
 							$sqlFilter = & $this->_tmpTableFilter;
+						elseif (array_key_exists('havingFilter', $field))
+							$sqlFilter = & $this->_filterHaving;
 						else
 							$sqlFilter = & $this->_filter;
 
@@ -884,10 +893,11 @@ abstract class AdminTab
 		'.(isset($this->_join) ? $this->_join.' ' : '').'
 		WHERE 1 '.(isset($this->_where) ? $this->_where.' ' : '').($this->deleted ? 'AND a.`deleted` = 0 ' : '').$this->_filter.'
 		'.(isset($this->_group) ? $this->_group.' ' : '').'
-		'.(isset($this->_having) ? $this->_having.' ' : '').'
+		'.((isset($this->_filterHaving) || isset($this->_having)) ? 'HAVING ' : '').(isset($this->_filterHaving) ? ltrim($this->_filterHaving, ' AND ') : '').(isset($this->_having) ? $this->_having.' ' : '').'
 		ORDER BY '.(($orderBy == $this->identifier) ? 'a.' : '').'`'.pSQL($orderBy).'` '.pSQL($orderWay).
 		($this->_tmpTableFilter ? ') tmpTable WHERE 1'.$this->_tmpTableFilter : '').'
 		LIMIT '.intval($start).','.intval($limit);
+		
 		$this->_list = Db::getInstance()->ExecuteS($sql);
 		$this->_listTotal = Db::getInstance()->getValue('SELECT FOUND_ROWS()');
 	}
@@ -939,7 +949,7 @@ abstract class AdminTab
 		if (Tools::getIsset($this->table.'Orderby'))
 		{
 			echo '&'.$this->table.'Orderby='.urlencode($this->_orderBy).
-			'&'.$this->table.'Orderway='.urlencode(strtolower($this->_orderWay));	
+			'&'.$this->table.'Orderway='.urlencode(strtolower($this->_orderWay));
 		}
 		echo '#'.$this->table.'" class="form">
 		<input type="hidden" id="submitFilter'.$this->table.'" name="submitFilter'.$this->table.'" value="0">
@@ -993,9 +1003,11 @@ abstract class AdminTab
 			<script type="text/javascript" src="../js/admin-dnd.js"></script>
 			';
 		}
-		echo '<table'.($this->identifier == 'id_product' ? ' id="'.(($id_category = intval(Tools::getValue('id_category', '1'))) ? $id_category : '').'"' : '' ).' class="table'.($this->identifier == 'id_product' ? ' tableDnD' : '' ).'" cellpadding="0" cellspacing="0"><tr class="nodrag nodrop">';
+		echo '<table'.($this->identifier == 'id_product' ? ' id="'.(($id_category = intval(Tools::getValue('id_category', '1'))) ? $id_category : '').'"' : '' ).' class="table'.($this->identifier == 'id_product' ? ' tableDnD' : '' ).'" cellpadding="0" cellspacing="0"><tr class="nodrag nodrop">
+				<th>';
 		if ($this->delete)
-			echo '<th><input type="checkbox" name="checkme" class="noborder" onclick="checkDelBoxes(this.form, \''.$this->table.'Box[]\', this.checked)" /></th>';
+			echo '<input type="checkbox" name="checkme" class="noborder" onclick="checkDelBoxes(this.form, \''.$this->table.'Box[]\', this.checked)" />';
+		echo '</th>';
 		foreach ($this->fieldsDisplay AS $key => $params)
 		{
 			echo '
@@ -1012,10 +1024,11 @@ abstract class AdminTab
 		/* Check if object can be modified, deleted or detailed */
 		if ($this->edit OR $this->delete OR ($this->view AND $this->view != 'noActionColumn'))
 			echo '<th style="width: 52px">'.$this->l('Actions').'</th>';
-		echo '</tr><tr class="nodrag nodrop" style="height: 35px;">';
-
+		echo '</tr><tr class="nodrag nodrop" style="height: 35px;">
+				<td class="center">';
 		if ($this->delete)
-			echo '<td class="center">--</td>';
+			echo '--';
+		echo '</td>';
 
 		/* Javascript hack in order to catch ENTER keypress event */
 		$keyPress = 'onkeypress="formSubmit(event, \'submitFilterButton_'.$this->table.'\');"';
@@ -1128,6 +1141,13 @@ abstract class AdminTab
 		global $currentIndex, $cookie;
 		$currency = new Currency(Configuration::get('PS_CURRENCY_DEFAULT'));
 
+		$_cacheLang['View'] = $this->l('View');
+		$_cacheLang['Edit'] = $this->l('Edit');
+		$_cacheLang['Delete'] = $this->l('Delete', __CLASS__, TRUE, FALSE);
+		$_cacheLang['DeleteItem'] = $this->l('Delete item #', __CLASS__, TRUE, FALSE);		
+		$_cacheLang['Duplicate'] = $this->l('Duplicate');
+		$_cacheLang['Copy images too?'] = $this->l('Copy images too?', __CLASS__, TRUE, FALSE);
+		
 		$irow = 0;
 		if ($this->_list AND isset($this->fieldsDisplay['position']))
 		{
@@ -1135,13 +1155,15 @@ abstract class AdminTab
 			sort($positions);
 		}
 		if ($this->_list)
+		{
 			foreach ($this->_list AS $i => $tr)
 			{
 				$id = $tr[$this->identifier];
-				echo '<tr'.($this->identifier == 'id_product' ? ' id="tr_'.(($id_category = intval(Tools::getValue('id_category', '1'))) ? $id_category : '').'_'.$id.'_'.$tr['position'].'"' : '').($irow++ % 2 ? ' class="alt_row"' : '').' '.((isset($tr['color']) AND $this->colorOnBackground) ? 'style="background-color: '.$tr['color'].'"' : '').'>';
-				if ($this->delete)
-					echo '<td class="center"><input type="checkbox" name="'.$this->table.'Box[]" value="'.$id.'" class="noborder" /></td>';
-
+				echo '<tr'.($this->identifier == 'id_product' ? ' id="tr_'.(($id_category = intval(Tools::getValue('id_category', '1'))) ? $id_category : '').'_'.$id.'_'.$tr['position'].'"' : '').($irow++ % 2 ? ' class="alt_row"' : '').' '.((isset($tr['color']) AND $this->colorOnBackground) ? 'style="background-color: '.$tr['color'].'"' : '').'>
+							<td class="center">';
+				if ($this->delete AND (!isset($this->_listSkipDelete) OR !in_array($id, $this->_listSkipDelete)))
+					echo '<input type="checkbox" name="'.$this->table.'Box[]" value="'.$id.'" class="noborder" />';
+				echo '</td>';
 				foreach ($this->fieldsDisplay AS $key => $params)
 				{
 					$tmp = explode('!', $key);
@@ -1193,8 +1215,6 @@ abstract class AdminTab
 						echo Tools::displayDate($tr[$key], $cookie->id_lang);
 					elseif (isset($params['type']) AND $params['type'] == 'datetime')
 						echo Tools::displayDate($tr[$key], $cookie->id_lang, true);
-					elseif ($key == 'physical_products_quantity')
-						echo Category::countNbProductAndSub($tr['id_category'], $cookie->id_lang);
 					elseif (isset($tr[$key]))
 					{
 						$echo = ($key == 'price' ? round($tr[$key], 2) : isset($params['maxlength']) ? Tools::substr($tr[$key], 0, $params['maxlength']).'...' : $tr[$key]);
@@ -1212,24 +1232,25 @@ abstract class AdminTab
 					if ($this->view)
 						echo '
 						<a href="'.$currentIndex.'&'.$this->identifier.'='.$id.'&view'.$this->table.'&token='.($token!=NULL ? $token : $this->token).'">
-						<img src="../img/admin/details.gif" border="0" alt="'.$this->l('View').'" title="'.$this->l('View').'" /></a>';
+						<img src="../img/admin/details.gif" alt="'.$_cacheLang['View'].'" title="'.$_cacheLang['View'].'" /></a>';
 					if ($this->edit)
 						echo '
 						<a href="'.$currentIndex.'&'.$this->identifier.'='.$id.'&update'.$this->table.'&token='.($token!=NULL ? $token : $this->token).'">
-						<img src="../img/admin/edit.gif" border="0" alt="'.$this->l('Edit').'" title="'.$this->l('Edit').'" /></a>';
+						<img src="../img/admin/edit.gif" alt="" title="'.$_cacheLang['Edit'].'" /></a>';
 					if ($this->delete AND (!isset($this->_listSkipDelete) OR !in_array($id, $this->_listSkipDelete)))
 						echo '
-						<a href="'.$currentIndex.'&'.$this->identifier.'='.$id.'&delete'.$this->table.'&token='.($token!=NULL ? $token : $this->token).'" onclick="return confirm(\''.$this->l('Delete item #', __CLASS__, TRUE, FALSE).$id.' ?\');">
-						<img src="../img/admin/delete.gif" border="0" alt="'.$this->l('Delete', __CLASS__, TRUE, FALSE).'" title="'.$this->l('Delete', __CLASS__, TRUE, FALSE).'" /></a>';
+						<a href="'.$currentIndex.'&'.$this->identifier.'='.$id.'&delete'.$this->table.'&token='.($token!=NULL ? $token : $this->token).'" onclick="return confirm(\''.$_cacheLang['DeleteItem'].$id.' ?\');">
+						<img src="../img/admin/delete.gif" alt="'.$_cacheLang['Delete'].'" title="'.$_cacheLang['Delete'].'" /></a>';
 					$duplicate = $currentIndex.'&'.$this->identifier.'='.$id.'&duplicate'.$this->table;
 					if ($this->duplicate)
 						echo '
-						<a class="pointer" onclick="if (confirm(\''.$this->l('Copy images too?', __CLASS__, TRUE, FALSE).'\')) document.location = \''.$duplicate.'&token='.($token!=NULL ? $token : $this->token).'\'; else document.location = \''.$duplicate.'&noimage=1&token='.($token ? $token : $this->token).'\';">
-						<img src="../img/admin/add.gif" border="0" alt="'.$this->l('Duplicate').'" title="'.$this->l('Duplicate').'" /></a>';
+						<a class="pointer" onclick="if (confirm(\''.$_cacheLang['Copy images too?'].'\')) document.location = \''.$duplicate.'&token='.($token!=NULL ? $token : $this->token).'\'; else document.location = \''.$duplicate.'&noimage=1&token='.($token ? $token : $this->token).'\';">
+						<img src="../img/admin/add.gif" alt="'.$_cacheLang['Duplicate'].'" title="'.$_cacheLang['Duplicate'].'" /></a>';
 					echo '</td>';
 				}
 				echo '</tr>';
-			}
+			}			
+		}
 	}
 
 	/**

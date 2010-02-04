@@ -93,7 +93,7 @@ class Mail
 			$message = new Swift_Message('['.Configuration::get('PS_SHOP_NAME').'] '.((is_array($_LANGMAIL) AND key_exists($subject, $_LANGMAIL)) ? $_LANGMAIL[$subject] : $subject));
 			$templateVars['{shop_logo}'] = (file_exists(_PS_IMG_DIR_.'logo.jpg')) ? $message->attach(new Swift_Message_Image(new Swift_File(_PS_IMG_DIR_.'logo.jpg'))) : '';
 			$templateVars['{shop_name}'] = Configuration::get('PS_SHOP_NAME');
-			$templateVars['{shop_url}'] = 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__;
+			$templateVars['{shop_url}'] = 'http://'.Tools::getHttpHost(false, true).__PS_BASE_URI__;
 			$swift->attachPlugin(new Swift_Plugin_Decorator(array($to_plugin => $templateVars)), 'decorator');
 			if ($configuration['PS_MAIL_TYPE'] == 3 OR $configuration['PS_MAIL_TYPE'] == 2)
 				$message->attach(new Swift_Message_Part($templateTxt, 'text/plain', '8bit', 'utf-8'));
@@ -108,5 +108,49 @@ class Mail
 		}
 	
 		catch (Swift_ConnectionException $e) { return false; }
+	}
+	
+	static public function sendMailTest($smtpChecked, $smtpServer, $content, $subject, $type, $to, $from, $smtpLogin, $smtpPassword, $smtpPort = 25, $smtpEncryption)
+	{
+		$swift = NULL;
+		$result = NULL;
+		try
+		{
+			
+			if($smtpChecked)
+			{
+				
+				$smtp = new Swift_Connection_SMTP($smtpServer, $smtpPort, ($smtpEncryption == "off") ? Swift_Connection_SMTP::ENC_OFF : (($smtpEncryption == "tls") ? Swift_Connection_SMTP::ENC_TLS : Swift_Connection_SMTP::ENC_SSL));
+				$smtp->setUsername($smtpLogin);
+				$smtp->setpassword($smtpPassword);
+				$smtp->setTimeout(5);
+				$swift = new Swift($smtp);
+			}
+			else
+			{
+				$swift = new Swift(new Swift_Connection_NativeMail());
+			}
+			
+			$message = new Swift_Message($subject, $content, $type);
+			
+			if ($swift->send($message, $to, $from))
+			{
+				$result = true;
+			}
+			else
+			{
+				$result = 999;
+			}
+			$swift->disconnect();
+		}
+		catch (Swift_Connection_Exception $e)
+		{
+		 $result = $e->getCode();
+		}
+		catch (Swift_Message_MimeException $e)
+		{
+		 $result = $e->getCode();
+		}
+		return $result;	
 	}
 }

@@ -26,6 +26,13 @@ class AdminModules extends AdminTab
 	{
 		global $currentIndex, $cookie;
 
+		if (Tools::isSubmit('all_module_send'))
+		{
+			if (Tools::getValue('all_module'))
+				Configuration::updateValue('PS_SHOW_ALL_MODULES', 0);
+			else
+				Configuration::updateValue('PS_SHOW_ALL_MODULES', 1);
+		}
 		/* Automatically copy a module from external URL and unarchive it in the appropriated directory */
 		if (Tools::isSubmit('active'))
 		{
@@ -209,22 +216,23 @@ class AdminModules extends AdminTab
 	
 	public function displayList()
 	{
-		global $currentIndex;
+		global $currentIndex, $cookie;
 		
 		$serialModules = '';
 		$modules = Module::getModulesOnDisk();
 		foreach ($modules AS $module)
-			$serialModules .= $module->name.' '.$module->version."\n";
+			$serialModules .= $module->name.' '.$module->version.'-'.($module->active ? 'a' : 'i')."\n";
 		$serialModules = urlencode($serialModules);
 
 		$this->displayJavascript();
 
+		$linkToSettings = 'index.php?tab=AdminPreferences&token='.Tools::getAdminToken('AdminPreferences'.intval(Tab::getIdFromClassName('AdminPreferences')).intval($cookie->id_employee));
 		echo '<span onclick="openCloseLayer(\'module_install\', 0);" style="cursor: pointer;font-weight: 700; float: left;"><img src="../img/admin/add.gif" alt="'.$this->l('Add a new module').'" class="middle" /> '.$this->l('Add a new module').'</span>';
-		if (@ini_get('allow_url_fopen'))
+		if (Configuration::get('PRESTASTORE_LIVE') AND @ini_get('allow_url_fopen'))
 			echo '<script type="text/javascript">
 				function getPrestaStore(){if (getE("prestastore").style.display!=\'block\')return;$.post("'.dirname($currentIndex).'/ajax.php",{page:"prestastore"},function(a){getE("prestastore-content").innerHTML=a;})}
 			</script>
-			<span onclick="openCloseLayer(\'prestastore\', 0); getPrestaStore();" style="cursor: pointer;font-weight: 700; float: left;margin-left:20px;"><img src="../img/admin/prestastore.gif" class="middle" /> '.$this->l('PrestaStore').'</span>';
+			<span onclick="openCloseLayer(\'prestastore\', 0); getPrestaStore();" style="cursor: pointer;font-weight: 700; float: left;margin-left:20px;"><img src="../img/admin/prestastore.gif" class="middle" /> '.$this->l('PrestaStore').'</span>&nbsp;(<a href="'.$linkToSettings.'">'.$this->l('disable').'</a>)';
 		echo '
 		<div class="clear">&nbsp;</div>
 		<div id="module_install" style="float: left;'.((Tools::isSubmit('submitDownload') OR Tools::isSubmit('submitDownload2')) ? '' : 'display: none;').'" class="width1">
@@ -254,14 +262,16 @@ class AdminModules extends AdminTab
 					</div>
 				</form>
 			</fieldset>
-		</div>
-		<div id="prestastore" style="margin-left:40px; display:none; float: left" class="width1">
-			<fieldset>
-				<legend><img src="http://www.prestastore.com/modules.php?'.(isset($_SERVER['SERVER_ADDR']) ? 'server='.ip2long($_SERVER['SERVER_ADDR']).'&' : '').'mods='.$serialModules.'" class="middle" />'.$this->l('Live from PrestaStore!').'</legend>
-				<div id="prestastore-content"></div>
-			</fieldset>
-		</div>
-		<div class="clear">&nbsp;</div>';
+		</div>';
+		if (Configuration::get('PRESTASTORE_LIVE'))
+			echo '
+			<div id="prestastore" style="margin-left:40px; display:none; float: left" class="width1">
+				<fieldset>
+					<legend><img src="http://www.prestastore.com/modules.php?'.(isset($_SERVER['SERVER_ADDR']) ? 'server='.ip2long($_SERVER['SERVER_ADDR']).'&' : '').'mods='.$serialModules.'" class="middle" />'.$this->l('Live from PrestaStore!').'</legend>
+					<div id="prestastore-content"></div>
+				</fieldset>
+			</div>';
+		echo '<div class="clear">&nbsp;</div>';
 
 		/* Scan modules directories and load modules classes */
 		$warnings = array();
@@ -276,6 +286,17 @@ class AdminModules extends AdminTab
 				if ($module->active AND $module->warning)
 					$this->displayWarning('<a href="'.$currentIndex.'&configure='.urlencode($module->name).'&token='.$this->token.'">'.$module->displayName.'</a> - '.stripslashes(pSQL($module->warning)));
 
+		$nameCountryDefault = Country::getNameById($cookie->id_lang, Configuration::get('PS_COUNTRY_DEFAULT'));
+		echo '
+		<form method="POST" id="form_all_module" name="fomr_all_module" action="">
+			<input type="hidden" name="all_module_send" value="" />
+			<input type="checkbox" name="all_module" style="vertical-align: middle;" id="all_module" '.(!Configuration::get('PS_SHOW_ALL_MODULES') ? 'checked="checked"' : '').' onchange="document.getElementById(\'form_all_module\').submit();" /> 
+			<label class="t" for="all_module">'.$this->l('Show only modules that can be used in my country').'</label> ('.$this->l('Current country:').' <a href="index.php?tab=AdminCountries&token='.Tools::getAdminToken('AdminCountries'.intval(Tab::getIdFromClassName('AdminCountries')).intval($cookie->id_employee)).'">'.$nameCountryDefault.'</a>)
+		</form>';
+
+		$showAllModules = Configuration::get('PS_SHOW_ALL_MODULES');
+		$isoCountryDefault = Country::getIsoById(Configuration::get('PS_COUNTRY_DEFAULT'));
+		
 		echo '
 		<div style="float:left; width:300px;">';
 		/* Browse modules by tab type */
@@ -293,36 +314,39 @@ class AdminModules extends AdminTab
 			/* Display modules for each tab type */
 			foreach ($tabModule as $module)
 			{
-				if ($module->id)
+				if ($showAllModules || (!$showAllModules && ((isset($module->limited_countries) && in_array(strtolower($isoCountryDefault), $module->limited_countries)) || !isset($module->limited_countries))))
 				{
-					$img = '<img src="../img/admin/enabled.gif" alt="'.$this->l('Module enabled').'" title="'.$this->l('Module enabled').'" />';
-					if ($module->warning)
-						$img = '<img src="../img/admin/warning.gif" alt="'.$this->l('Module installed but with warnings').'" title="'.$this->l('Module installed but with warnings').'" />';
-					if (!$module->active)
-						$img = '<img src="../img/admin/disabled.gif" alt="'.$this->l('Module disabled').'" title="'.$this->l('Module disabled').'" />';
-				} else
-					$img = '<img src="../img/admin/cog.gif" alt="'.$this->l('Module not installed').'" title="'.$this->l('Module not installed').'" />';
-				echo '
-				<tr'.($irow++ % 2 ? ' class="alt_row"' : '').' style="height: 42px;">
-					<td style="padding-left: 10px;"><img src="../modules/'.$module->name.'/logo.gif" alt="" /> <b>'.stripslashes($module->displayName).'</b>'.($module->version ? ' v'.$module->version.(strpos($module->version, '.') !== false ? '' : '.0') : '').'<br />'.$module->description.'</td>
-					<td width="85">'.(($module->active AND method_exists($module, 'getContent')) ? '<a href="'.$currentIndex.'&configure='.urlencode($module->name).'&token='.$this->token.'">&gt;&gt;&nbsp;'.$this->l('Configure').'</a>' : '').'</td>
-					<td class="center" width="20">';
-				if ($module->id)
-					echo '<a href="'.$currentIndex.'&token='.$this->token.'&module_name='.$module->name.'&'.($module->active ? 'desactive' : 'active').'">';
-				echo $img;
-				if ($module->id)
-					'</a>';
-				echo '
-					</td>
-					<td class="center" width="80">'.((!$module->id)
-					? '<input type="button" class="button small" name="Install" value="'.$this->l('Install').'"
-					onclick="javascript:document.location.href=\''.$currentIndex.'&install='.urlencode($module->name).'&token='.$this->token.'\'" />'
-					: '<input type="button" class="button small" name="Uninstall" value="'.$this->l('Uninstall').'"
-					onclick="'.(empty($module->confirmUninstall) ? '' : 'if(confirm(\''.addslashes($module->confirmUninstall).'\')) ').'document.location.href=\''.$currentIndex.'&uninstall='.urlencode($module->name).'&token='.$this->token.'\';" />').'</td>
-					<td style="padding-right: 10px">
-						<input type="checkbox" name="modules" value="'.urlencode($module->name).'" '.(empty($module->confirmUninstall) ? 'rel="false"' : 'rel="'.addslashes($module->confirmUninstall).'"').' />
-					</td>
-				</tr>';
+					if ($module->id)
+					{
+						$img = '<img src="../img/admin/enabled.gif" alt="'.$this->l('Module enabled').'" title="'.$this->l('Module enabled').'" />';
+						if ($module->warning)
+							$img = '<img src="../img/admin/warning.gif" alt="'.$this->l('Module installed but with warnings').'" title="'.$this->l('Module installed but with warnings').'" />';
+						if (!$module->active)
+							$img = '<img src="../img/admin/disabled.gif" alt="'.$this->l('Module disabled').'" title="'.$this->l('Module disabled').'" />';
+					} else
+						$img = '<img src="../img/admin/cog.gif" alt="'.$this->l('Module not installed').'" title="'.$this->l('Module not installed').'" />';
+					echo '
+					<tr'.($irow++ % 2 ? ' class="alt_row"' : '').' style="height: 42px;">
+						<td style="padding-left: 10px;"><img src="../modules/'.$module->name.'/logo.gif" alt="" /> <b>'.stripslashes($module->displayName).'</b>'.($module->version ? ' v'.$module->version.(strpos($module->version, '.') !== false ? '' : '.0') : '').'<br />'.$module->description.'</td>
+						<td width="85">'.(($module->active AND method_exists($module, 'getContent')) ? '<a href="'.$currentIndex.'&configure='.urlencode($module->name).'&token='.$this->token.'">&gt;&gt;&nbsp;'.$this->l('Configure').'</a>' : '').'</td>
+						<td class="center" width="20">';
+					if ($module->id)
+						echo '<a href="'.$currentIndex.'&token='.$this->token.'&module_name='.$module->name.'&'.($module->active ? 'desactive' : 'active').'">';
+					echo $img;
+					if ($module->id)
+						'</a>';
+					echo '
+						</td>
+						<td class="center" width="80">'.((!$module->id)
+						? '<input type="button" class="button small" name="Install" value="'.$this->l('Install').'"
+						onclick="javascript:document.location.href=\''.$currentIndex.'&install='.urlencode($module->name).'&token='.$this->token.'\'" />'
+						: '<input type="button" class="button small" name="Uninstall" value="'.$this->l('Uninstall').'"
+						onclick="'.(empty($module->confirmUninstall) ? '' : 'if(confirm(\''.addslashes($module->confirmUninstall).'\')) ').'document.location.href=\''.$currentIndex.'&uninstall='.urlencode($module->name).'&token='.$this->token.'\';" />').'</td>
+						<td style="padding-right: 10px">
+							<input type="checkbox" name="modules" value="'.urlencode($module->name).'" '.(empty($module->confirmUninstall) ? 'rel="false"' : 'rel="'.addslashes($module->confirmUninstall).'"').' />
+						</td>
+					</tr>';
+				}
 			}
 			echo '</table>
 			</div>';

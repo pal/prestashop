@@ -3,10 +3,10 @@
 	<head>
 		<title>{$meta_title|escape:'htmlall':'UTF-8'}</title>
 {if isset($meta_description) AND $meta_description}
-		<meta name="description" content="{$meta_description|escape:htmlall:'UTF-8'}" />
+		<meta name="description" content="{$meta_description|escape:html:'UTF-8'}" />
 {/if}
 {if isset($meta_keywords) AND $meta_keywords}
-		<meta name="keywords" content="{$meta_keywords|escape:htmlall:'UTF-8'}" />
+		<meta name="keywords" content="{$meta_keywords|escape:html:'UTF-8'}" />
 {/if}
 		<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=utf-8" />
 		<meta name="generator" content="PrestaShop" />
@@ -24,6 +24,7 @@
 			var static_token = '{$static_token}';
 			var token = '{$token}';
 			var priceDisplayPrecision = {$priceDisplayPrecision*$currency->decimals};
+			var roundMode = {$roundMode};
 		</script>
 		<script type="text/javascript" src="{$content_dir}js/jquery/jquery-1.2.6.pack.js"></script>
 		<script type="text/javascript" src="{$content_dir}js/jquery/jquery.easing.1.3.js"></script>

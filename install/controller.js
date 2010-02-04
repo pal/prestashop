@@ -1,5 +1,6 @@
 //constant
 verifMailREGEX = /^([\w-]+(?:\.[\w-]+)*)@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$/;
+verifNameREGEX = /^[^0-9!<>,;?=+()@#"°{}_$%:]*$/;
 
 //params
 configIsOk = false;
@@ -59,28 +60,28 @@ function showStep(aStep)
 				$('#tabs li:nth-child(1)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(2)').addClass("selected").removeClass("finished");
 				$('#tabs li:nth-child(3)').removeClass("selected").removeClass("finished");
-				$('#tabs li:nth-child(3)').removeClass("selected").removeClass("finished");
+				$('#tabs li:nth-child(4)').removeClass("selected").removeClass("finished");
 				break;
 				
 				case 7 :
 				$('#tabs li:nth-child(1)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(2)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(3)').addClass("selected").removeClass("finished");
-				$('#tabs li:nth-child(3)').removeClass("selected").removeClass("finished");
+				$('#tabs li:nth-child(4)').removeClass("selected").removeClass("finished");
 				break;
 				
 				case 8 :
 				$('#tabs li:nth-child(1)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(2)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(3)').addClass("selected").removeClass("finished");
-				$('#tabs li:nth-child(3)').removeClass("selected").removeClass("finished");
+				$('#tabs li:nth-child(4)').removeClass("selected").removeClass("finished");
 				break;
 				
 				case 9 :
 				$('#tabs li:nth-child(1)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(2)').removeClass("selected").addClass("finished");
 				$('#tabs li:nth-child(3)').removeClass("selected").addClass("finished");
-				$('#tabs li:nth-child(3)').removeClass("selected").removeClass("finished");
+				$('#tabs li:nth-child(4)').addClass("selected").removeClass("finished");
 				break;
 				
 			}
@@ -122,9 +123,9 @@ function showStep(aStep)
 		case 4:
 		document.title = step4title;
 		$("#btBack")
-			.removeAttr("disabled")
-			.removeClass("disabled")
-			.show('slow');
+			.attr("disabled", "disabled")
+			.addClass("disabled")
+			.hide('slow');
 		break;
 		
 		case 5 :
@@ -252,6 +253,7 @@ function verifyAndSetRequire()
 				if (result == "fail") configIsOk = false;
 			}
 			
+			
 			testListOptional = testLists[1].getElementsByTagName('test');
 			
 			for (i = 0; i < testListOptional.length; i++){
@@ -260,6 +262,11 @@ function verifyAndSetRequire()
 					.removeClass( (result == "fail") ? "ok" : "fail" )
 					.addClass(result);
 			}
+			
+			if(configIsOk)
+				$('h3#resultConfig'+isUpdate).html(txtConfigIsOk).slideDown('slow');
+			else
+				$('h3#resultConfig'+isUpdate).html(txtConfigIsNotOk).slideDown('slow');
 			
 			$("div#sheet_require"+isUpdate+" > ul").slideDown("1500");
 			
@@ -319,7 +326,7 @@ function verifyDbAccess ()
 			+"&type=MySQL"
 			+"&server="+ $("#dbServer").val()
 			+"&login="+ $("#dbLogin").val()
-			+"&password="+ $("#dbPassword").val()
+			+"&password="+encodeURIComponent($("#dbPassword").val())
 			+"&name="+ $("#dbName").val()
 		,
 		success: function(ret)
@@ -364,7 +371,7 @@ function createDB()
 		"&type=MySQL"+
 		"&server="+ $("#dbServer").val()+
 		"&login="+ $("#dbLogin").val()+
-		"&password="+ $("#dbPassword").val()+
+		"&password="+encodeURIComponent($("#dbPassword").val())+
 		"&name="+ $("#dbName").val()
 	   ,
 	   success: function(ret)
@@ -584,6 +591,7 @@ function verifyShopInfos()
 	   data:
 		"method=checkShopInfos"+
 		"&isoCode="+isoCodeLocalLanguage+
+		"&infosCountry="+ encodeURIComponent($("select#infosCountry").val())+
 		"&infosShop="+ encodeURIComponent($("input#infosShop").val())+
 		"&infosFirstname="+ encodeURIComponent($("input#infosFirstname").val())+
 		"&infosName="+ encodeURIComponent($("input#infosName").val())+
@@ -615,6 +623,8 @@ function verifyShopInfos()
 			else if (!ajaxRefreshField(9, "resultInfosLanguages", fieldsList, "infosLanguages")) validShopInfos = false;
 			else if (!ajaxRefreshField(11, "resultInfosSQL", fieldsList, "infosSQL")) validShopInfos = false;
 			else if (!ajaxRefreshField(10, "resultInfosNotification", fieldsList, "infosNotification")) validShopInfos = false;
+			else if (!ajaxRefreshField(5, "resultInfosFirstname", fieldsList, "validateFirstname")) validShopInfos = false;
+			else if (!ajaxRefreshField(6, "resultInfosName", fieldsList, "validateName")) validShopInfos = false;
 			else
 			{
 				$('#endShopName').html($('input#infosShop').val());
@@ -662,6 +672,50 @@ function autoCheckField(idField, idResultSpan, typeVerif)
 							.show("slow")
 							.addClass("fail")
 							.html(txtError[3]);
+					}
+					else
+					{
+						$(idResultSpan)
+							.hide("slow")
+							.removeClass("fail")
+							.html("");
+					}
+				}
+			);
+		break;
+		
+		case "firstnameFormat" :
+			$(idField).blur(
+			function()
+				{
+					if (!verifNameREGEX.test( $(this).val() ))
+					{
+						$(idResultSpan)
+							.show("slow")
+							.addClass("fail")
+							.html(txtError[47]);
+					}
+					else
+					{
+						$(idResultSpan)
+							.hide("slow")
+							.removeClass("fail")
+							.html("");
+					}
+				}
+			);
+		break;
+		
+		case "nameFormat" :
+			$(idField).blur(
+			function()
+				{
+					if (!verifNameREGEX.test( $(this).val() ))
+					{
+						$(idResultSpan)
+							.show("slow")
+							.addClass("fail")
+							.html(txtError[48]);
 					}
 					else
 					{
@@ -852,8 +906,8 @@ $(document).ready(
 		
 		//autocheck fields
 		autoCheckField("#infosShop", "#resultInfosShop", "required");
-		autoCheckField("#infosFirstname", "#resultInfosFirstname", "required");
-		autoCheckField("#infosName", "#resultInfosName", "required");
+		autoCheckField("#infosFirstname", "#resultInfosFirstname", "firstnameFormat");
+		autoCheckField("#infosName", "#resultInfosName", "nameFormat");
 		autoCheckField("#infosEmail", "#resultInfosEmail", "mailFormat");
 		autoCheckField("#infosPassword", "#resultInfosPassword", "required");
 		autoCheckField("#infosPasswordRepeat", "#resultInfosPasswordRepeat", "required");

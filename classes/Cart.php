@@ -62,6 +62,7 @@ class		Cart extends ObjectModel
 	private		$_nb_products = NULL;
 	private		$_products = NULL;
 	private		$_totalWeight = NULL;
+	private		$_taxCalculationMethod = PS_TAX_EXC;
 	private	static $_discounts = NULL;
 	private	static $_discountsLite = NULL;
 	private	static $_carriers = NULL;
@@ -87,6 +88,12 @@ class		Cart extends ObjectModel
 		$fields['date_upd'] = pSQL($this->date_upd);
 
 		return $fields;
+	}
+
+	public function __construct($id = NULL, $id_lang = NULL)
+	{
+		parent::__construct($id, $id_lang);
+		$this->_taxCalculationMethod = $this->id_customer ? Group::getPriceDisplayMethod(intval($this->id_customer)) : Group::getDefaultPriceDisplayMethod();
 	}
 
 	public function add($autodate = true, $nullValues = false)
@@ -132,16 +139,16 @@ class		Cart extends ObjectModel
 		WHERE `id_cart` = '.intval($this->id));
 
 		$products = $this->getProducts();
-		foreach ($result AS $k=>$discount)
+		foreach ($result AS $k => $discount)
 		{
-			$categories = Discount::getCategories($discount['id_discount']);
+			$categories = Discount::getCategories(intval($discount['id_discount']));
 			$in_category = false;
 			foreach ($products AS $product)
-					if (Product::idIsOnCategoryId(intval($product['id_product']), $categories))
-					{
-						$in_category = true;
-						break;
-					}
+				if (Product::idIsOnCategoryId(intval($product['id_product']), $categories))
+				{
+					$in_category = true;
+					break;
+				}
 			if (!$in_category)
 				unset($result[$k]);
 		}
@@ -211,7 +218,7 @@ class		Cart extends ObjectModel
         pa.`ecotax` AS ecotax_attr, i.`id_image`, il.`legend`, pl.`link_rewrite`, cl.`link_rewrite` AS category, CONCAT(cp.`id_product`, cp.`id_product_attribute`) AS unique_id,
         IF (IFNULL(pa.`reference`, \'\') = \'\', p.`reference`, pa.`reference`) AS reference, 
         IF (IFNULL(pa.`supplier_reference`, \'\') = \'\', p.`supplier_reference`, pa.`supplier_reference`) AS supplier_reference, 
-        IF (IFNULL(pa.`weight`, 0) = \'\', p.`weight`, pa.`weight`) AS weight_attribute,
+        (p.`weight`+ pa.`weight`) weight_attribute,
         IF (IFNULL(pa.`ean13`, \'\') = \'\', p.`ean13`, pa.`ean13`) AS ean13
 		FROM `'._DB_PREFIX_.'cart_product` cp
 		LEFT JOIN `'._DB_PREFIX_.'product` p ON p.`id_product` = cp.`id_product`
@@ -229,23 +236,32 @@ class		Cart extends ObjectModel
 		GROUP BY unique_id
 		ORDER BY cp.date_add ASC';
 		$result = Db::getInstance()->ExecuteS($sql);
-
-		/* Modify SQL results */
-		$products = array();
-
 		if (empty($result))
 			return array();
+
+		/* Modify SQL results */
+		$this->_products = array();
+
 		foreach ($result AS $k => $row)
 		{
 			if (isset($row['ecotax_attr']) AND $row['ecotax_attr'] > 0)
 				$row['ecotax'] = floatval($row['ecotax_attr']);
 			$row['stock_quantity'] = intval($row['quantity']);
-			$row['weight'] = $row['weight_attribute'];
-			$row['quantity'] = intval($row['cart_quantity']);
-			$row['price'] = Product::getPriceStatic(intval($row['id_product']), false, isset($row['id_product_attribute']) ? intval($row['id_product_attribute']) : NULL, 6, NULL, false, true, intval($row['quantity']));
-			$row['price_wt'] = Product::getPriceStatic(intval($row['id_product']), true, isset($row['id_product_attribute']) ? intval($row['id_product_attribute']) : NULL, 6, NULL, false, true, intval($row['quantity']));
-			$row['total'] = $row['price'] * intval($row['quantity']);
-			$row['total_wt'] = $row['price_wt'] * intval($row['quantity']);
+			if ($row['id_product_attribute'])
+				$row['weight'] = $row['weight_attribute'];
+			if ($this->_taxCalculationMethod == PS_TAX_EXC)
+			{
+				$row['price'] = Product::getPriceStatic(intval($row['id_product']), false, isset($row['id_product_attribute']) ? intval($row['id_product_attribute']) : NULL, 2, NULL, false, true, intval($row['cart_quantity']), false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL)); // Here taxes are computed only once the quantity has been applied to the product price
+				$row['price_wt'] = 0.0;
+				$row['total_wt'] = Tools::ps_round($row['price'] * floatval($row['cart_quantity']) * (1 + floatval($row['rate']) / 100), 2);
+			}
+			else
+			{
+				$row['price'] = Product::getPriceStatic(intval($row['id_product']), false, intval($row['id_product_attribute']), 6, NULL, false, true, $row['cart_quantity'], false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL));
+				$row['price_wt'] = Product::getPriceStatic(intval($row['id_product']), true, intval($row['id_product_attribute']), 2, NULL, false, true, $row['cart_quantity'], false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL));
+				$row['total_wt'] = $row['price_wt'] * intval($row['cart_quantity']);
+			}
+			$row['total'] = Tools::ps_round($row['price'] * intval($row['cart_quantity']), 2);
 			$row['id_image'] = Product::defineProductImage($row);
 			$row['allow_oosp'] = Product::isAvailableWhenOutOfStock($row['out_of_stock']);
 			$row['features'] = Product::getFeaturesStatic(intval($row['id_product']));
@@ -276,9 +292,8 @@ class		Cart extends ObjectModel
 				$row['attributes_small'] = $attributesListSmall;
 				$row['stock_quantity'] = $row['quantity_attribute'];
 			}
-			$products[] = $row;
+			$this->_products[] = $row;
 		}
-		$this->_products = $products;
 		return $this->_products;
 	}
 
@@ -553,8 +568,8 @@ class		Cart extends ObjectModel
 			die(Tools::displayError());
 		return Tools::displayPrice($cart->getOrderTotal(), new Currency(intval($cart->id_currency)), false, false);
 	}
-	
-	function getOrderTotal($withTaxes = true, $type = 3)
+
+	public function getOrderTotal($withTaxes = true, $type = 3)
 	{
 		if (!$this->id)
 			return 0;
@@ -571,18 +586,29 @@ class		Cart extends ObjectModel
 		$shipping_fees = ($type != 4 AND $type != 7) ? $this->getOrderShippingCost(NULL, intval($withTaxes)) : 0;
 		if ($type == 7)
 			$type = 1;
-			
+
 		$products = $this->getProducts();
 		$order_total = 0;
 		foreach ($products AS $product)
 		{
-			$price = floatval(Product::getPriceStatic(intval($product['id_product']), $withTaxes, intval($product['id_product_attribute']), 6, NULL, false, true, $product['quantity']));
-			$total_price = $price * intval($product['quantity']);
+			if ($this->_taxCalculationMethod == PS_TAX_EXC)
+			{
+				// Here taxes are computed only once the quantity has been applied to the product price
+				$price = Product::getPriceStatic(intval($product['id_product']), false, intval($product['id_product_attribute']), 6, NULL, false, true, $product['cart_quantity'], false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL));
+				$total_price = $price * intval($product['cart_quantity']);
+				if ($withTaxes)
+					$total_price = Tools::ps_round($total_price * (1 + floatval($product['rate']) / 100), 2);
+			}
+			else
+			{
+				$price = Product::getPriceStatic(intval($product['id_product']), $withTaxes, intval($product['id_product_attribute']), $withTaxes ? 6 : 2, NULL, false, true, $product['cart_quantity'], false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL));
+				$total_price = Tools::ps_round($price * intval($product['cart_quantity']), 2);
+			}
 			$order_total += $total_price;
 		}
 		$order_total_products = $order_total;
-		if ($type == 2) $order_total = 0;
-
+		if ($type == 2)
+			$order_total = 0;
 		// Wrapping Fees
 		$wrapping_fees = 0;
 		if ($this->gift)
@@ -593,6 +619,7 @@ class		Cart extends ObjectModel
 				$wrapping_fees_tax = new Tax(intval(Configuration::get('PS_GIFT_WRAPPING_TAX')));
 				$wrapping_fees /= 1 + ((floatval($wrapping_fees_tax->rate) / 100));
 			}
+			$wrapping_fees = Tools::ps_round($wrapping_fees, 2);
 		}
 
 		if ($type != 1)
@@ -611,28 +638,27 @@ class		Cart extends ObjectModel
 							foreach($products AS $product)
 							{
 								$categories = Discount::getCategories($discount->id);
-								if(count($categories))
-										if (Product::idIsOnCategoryId($product['id_product'], $categories))
-										{
-											if($type == 2)
-												$order_total -= $shipping_fees;
-											$shipping_fees = 0;
-											break;
-										}
+								if (count($categories) AND Product::idIsOnCategoryId($product['id_product'], $categories))
+								{
+									if($type == 2)
+										$order_total -= $shipping_fees;
+									$shipping_fees = 0;
+									break;
+								}
 							}
 					}
 				}
 				/* Secondly applying all vouchers to the correct amount */
 				foreach ($discounts AS $discount)
 					if ($discount->id_discount_type != 3)
-						$order_total -= floatval($discount->getValue(sizeof($discounts), $order_total_products, $shipping_fees, $this->id, intval($withTaxes)));
+						$order_total -= Tools::ps_round(floatval($discount->getValue(sizeof($discounts), $order_total_products, $shipping_fees, $this->id, intval($withTaxes))), 2);
 			}
 		}
 		if ($type == 5) return $shipping_fees;
 		if ($type == 6) return $wrapping_fees;
 		if ($type == 3) $order_total += $shipping_fees + $wrapping_fees;
 		if ($order_total < 0 AND $type != 2) return 0;
-		return floatval($order_total);
+		return Tools::ps_round(floatval($order_total), 2);
 	}
 
 	/**
@@ -653,24 +679,24 @@ class		Cart extends ObjectModel
 		$discounts = $this->getDiscounts(true);
 		if ($discounts)
 			foreach ($discounts AS $id_discount)
-			{
-				$discount = new Discount(intval($id_discount['id_discount']));
-				if (!Validate::isLoadedObject($discount))
-					die(Tools::displayError());
-				if ($discount->id_discount_type == 3)
-				{
-					$total_cart = 0;
-					$categories = Discount::getCategories($discount->id);
-					foreach($products AS $product)
+				if ($id_discount['id_discount_type'] == 3)
+				{				
+					if ($id_discount['minimal'] > 0)
 					{
-						if(count($categories))
-							if (Product::idIsOnCategoryId($product['id_product'], $categories))
+						$total_cart = 0;
+
+						$categories = Discount::getCategories(intval($id_discount['id_discount']));
+						if (sizeof($categories))
+							foreach($products AS $product)
+								if (Product::idIsOnCategoryId(intval($product['id_product']), $categories))
 									$total_cart += $product['total_wt'];
+						
+						if ($total_cart >= $id_discount['minimal'])
+							return 0;
 					}
-					if ($total_cart >= $discount->minimal)
+					else
 						return 0;
 				}
-			}
 
 		// Order total without fees
 		$orderTotal = $this->getOrderTotal(true, 7);
@@ -741,15 +767,17 @@ class		Cart extends ObjectModel
 			else
 				$shipping_cost += $carrier->getDeliveryPriceByPrice($orderTotal, $id_zone);
 		}
+		$shipping_cost = Tools::convertPrice($shipping_cost);
+		
+		// Adding handling charges
+		if (isset($configuration['PS_SHIPPING_HANDLING']) AND $carrier->shipping_handling)
+            $shipping_cost += floatval($configuration['PS_SHIPPING_HANDLING']);
 		
 		// Apply tax
 		if (isset($carrierTax))
 			 $shipping_cost *= 1 + ($carrierTax / 100);
 
-		// Adding handling charges
-		if (isset($configuration['PS_SHIPPING_HANDLING']) AND $carrier->shipping_handling)
-            $shipping_cost += floatval($configuration['PS_SHIPPING_HANDLING']);
-		return floatval($shipping_cost);
+		return floatval(Tools::ps_round(floatval($shipping_cost), 2));
     }
 
 	/**
@@ -873,17 +901,17 @@ class		Cart extends ObjectModel
 			'carrier' => new Carrier(intval($this->id_carrier), $cookie->id_lang),
 			'products' => $this->getProducts(false),
 			'discounts' => $this->getDiscounts(),
-			'total_discounts' => number_format($this->getOrderTotal(true, 2), 2, '.', ''),
-			'total_discounts_tax_exc' => number_format($this->getOrderTotal(false, 2), 2, '.', ''),
-			'total_wrapping' => number_format($this->getOrderTotal(true, 6), 2, '.', ''),
-			'total_wrapping_tax_exc' => number_format($this->getOrderTotal(false, 6), 2, '.', ''),
-			'total_shipping' => number_format($this->getOrderShippingCost(), 2, '.', ''),
-			'total_shipping_tax_exc' => number_format($this->getOrderShippingCost(NULL, false), 2, '.', ''),
-			'total_products_wt' => number_format($this->getOrderTotal(true, 1), 2, '.', ''),
-			'total_products' => number_format($this->getOrderTotal(false, 1), 2, '.', ''),
-			'total_price' => number_format($this->getOrderTotal(), 2, '.', ''),
-			'total_tax' => number_format($this->getOrderTotal() - $this->getOrderTotal(false), 2, '.', ''),
-			'total_price_without_tax' => number_format($this->getOrderTotal(false), 2, '.', ''));
+			'total_discounts' => $this->getOrderTotal(true, 2),
+			'total_discounts_tax_exc' => $this->getOrderTotal(false, 2),
+			'total_wrapping' => $this->getOrderTotal(true, 6),
+			'total_wrapping_tax_exc' => $this->getOrderTotal(false, 6),
+			'total_shipping' => $this->getOrderShippingCost(),
+			'total_shipping_tax_exc' => $this->getOrderShippingCost(NULL, false),
+			'total_products_wt' => $this->getOrderTotal(true, 1),
+			'total_products' => $this->getOrderTotal(false, 1),
+			'total_price' => $this->getOrderTotal(),
+			'total_tax' => $this->getOrderTotal() - $this->getOrderTotal(false),
+			'total_price_without_tax' => $this->getOrderTotal(false));
 	}
 
 	/**
@@ -917,7 +945,7 @@ class		Cart extends ObjectModel
 	{
 		if (Configuration::get('PS_STOCK_MANAGEMENT'))
 			foreach ($this->getProducts() AS $product)
-			    if (!$product['active'] OR (!$product['allow_oosp'] AND $product['stock_quantity'] < $product['quantity']))
+			    if (!$product['active'] OR (!$product['allow_oosp'] AND $product['stock_quantity'] < $product['cart_quantity']))
 			    	return false;
 		return true;
 	}
@@ -943,9 +971,15 @@ class		Cart extends ObjectModel
 	{
 		if (!intval(self::getNbProducts($this->id)))
 			return false;
+
 		$allVirtual = true;
 		foreach ($this->getProducts() AS $product)
-			$allVirtual &= (ProductDownload::getIdFromIdProduct(intval($product['id_product'])) ? true : false);
+		{
+			$res = (ProductDownload::getIdFromIdProduct(intval($product['id_product'])) ? true : false);
+			$allVirtual &= $res;
+			if (!$res)
+				return $allVirtual;
+		}
 		return $allVirtual;
 	}
 

@@ -79,6 +79,7 @@ class PaypalAdmin extends PaypalAPI
 			Configuration::updateValue('PAYPAL_HEADER', strval($_POST['header']));
 			Configuration::updateValue('PAYPAL_SANDBOX', intval($_POST['sandbox']));
 			Configuration::updateValue('PAYPAL_EXPRESS_CHECKOUT', intval($_POST['expressCheckout']));
+			Configuration::updateValue('PAYPAL_INTEGRAL', intval($_POST['pp_integral']));
 		}
 		elseif (isset($_POST['submitPaypalAPI']))
 		{
@@ -111,20 +112,29 @@ class PaypalAdmin extends PaypalAPI
 		$apiPassword = isset($_POST['apiPassword']) ? strval($_POST['apiPassword']) : $this->_apiPassword;
 		$apiSignature = isset($_POST['apiSignature']) ? strval($_POST['apiSignature']) : $this->_apiSignature;
 		$expressCheckout = isset($_POST['expressCheckout']) ? intval($_POST['expressCheckout']) : $this->_expressCheckout;
+		$pp_integral = isset($_POST['pp_integral']) ? intval($_POST['pp_integral']) : $this->_pp_integral;
 
 		$html= '
 		<fieldset>
 			<legend><img src="../img/admin/unknown.gif" />'.$this->l('Server Information').'</legend>
-			<b style="color: red;">'.$this->l('In order to use your PayPalAPI payment module, your webserver NEEDS to support SSL protocol (eg. openSSL)').'.</b><br /><br />
+			<b style="color: red;">'.$this->l('Prior to the use of the PayPal module, please check if Curl or openSSL are activated on your server').'.</b><br /><br />
 			'.$this->l('Without SSL, PayPalAPI module will not be able to contact PayPal').'.<br />
 		</fieldset>
 		<form action="'.strval($_SERVER['REQUEST_URI']).'" method="post" style="margin-top:20px; float:left;">
-			<fieldset style="height:180px; width:400px;">
+			<fieldset style="height:260px; width:400px;">
 				<legend><img src="../img/admin/edit.gif" />'.$this->l('General settings').'</legend>
 				<label style="width:140px;">'.$this->l('Sandbox mode:').'</label>
 				<div class="margin-form" style="padding-left:160px;">
 					<input type="radio" name="sandbox" value="1" '.($sandbox ? 'checked="checked"' : '').' /> '.$this->l('Yes').'
 					<input type="radio" name="sandbox" value="0" '.(!$sandbox ? 'checked="checked"' : '').' /> '.$this->l('No').'
+				</div>
+				<label style="clear:both; width:140px;">'.$this->l('PayPal Integral:').'</label>
+				<div class="margin-form" style="padding-left:160px;">
+					<input type="radio" name="pp_integral" value="1" '.($pp_integral ? 'checked="checked"' : '').' /> '.$this->l('Activate payments with PayPal account, credit cards (CB, Visa, Mastercard) and private cards (Aurore, Cofinoga, 4 stars)').'
+				</div>
+				<label style="clear:both; width:140px;">'.$this->l('PayPal Option+:').'</label>
+				<div class="margin-form" style="padding-left:160px;">
+					<input type="radio" name="pp_integral" value="0" '.(!$pp_integral ? 'checked="checked"' : '').' /> '.$this->l('Activate payments with PayPal account').'
 				</div>
 				<label style="clear:both; width:140px;">'.$this->l('Express Checkout:').'</label>
 				<div class="margin-form" style="padding-left:160px;">
@@ -140,7 +150,7 @@ class PaypalAdmin extends PaypalAPI
 			</fieldset>
 		</form>
 		<form action="'.strval($_SERVER['REQUEST_URI']).'" method="post" style="margin:20px 0px 0px 40px; float:left;">
-			<fieldset style="height:180px; width:428px;">
+			<fieldset style="height:260px; width:428px;">
 				<legend><img src="../img/admin/cog.gif" />'.$this->l('API settings:').'</legend>
 				<label style="width:140px;">'.$this->l('API user:').'</label>
 				<div class="margin-form" style="padding-left:160px;"><input type="text" size="20" name="apiUser" value="'.($apiUser ? htmlentities($apiUser, ENT_COMPAT, 'UTF-8') : '').'" /></div>
@@ -160,12 +170,11 @@ class PaypalAdmin extends PaypalAPI
 			'.$this->l('2. Click the Profile subtab located under the My Account heading.').'<br /><br />
 			'.$this->l('3. Click the API Access link under the Account Information header.').'<br /><br />
 			'.$this->l('4. Click the View API Certificate link in the right column.').'<br /><br />
-			'.$this->l('5. Click the Request API Credentials link.').'<br /><br />
-			'.$this->l('6. Click the Request API signature radio button on the Request API Credentials page.').'<br /><br />
-			'.$this->l('7. Complete the Request API Credential Request form by clicking the agreement checkbox and clicking Submit.').'<br /><br />
-			'.$this->l('8. Save the values for API Username, Password and Signature (make sure this long character signature is copied).').'<br /><br />
-			'.$this->l('9. Click the Done button after copying your API Username, Password, and Signature.').'<br /><br />
-			'.$this->l('10. This will take you back to the API Access screen where you are finished.').'<br /><br />
+			'.$this->l('5. Click the Request API signature radio button on the Request API Credentials page.').'<br /><br />
+			'.$this->l('6. Complete the Request API Credential Request form by clicking the agreement checkbox and clicking Submit.').'<br /><br />
+			'.$this->l('7. Save the values for API Username, Password and Signature (make sure this long character signature is copied).').'<br /><br />
+			'.$this->l('8. Click the Done button after copying your API Username, Password, and Signature.').'<br /><br />
+			'.$this->l('9. This will take you back to the API Access screen where you are finished.').'<br /><br />
 		</fieldset>';
 		return $html;
 	}

@@ -10,11 +10,15 @@ if ($cookie->isLogged())
 
 //CSS ans JS file calls
 $js_files = array(
-	_THEME_JS_DIR_.'tools/statesManagement.js'
+	_THEME_JS_DIR_.'tools/statesManagement.js',
+	__PS_BASE_URI__.'js/jquery/jquery-typewatch.pack.js'
 );
 $errors = array();
 
 $back = Tools::getValue('back');
+$key = Tools::safeOutput(Tools::getValue('key'));
+if (!empty($key))
+	$back .= (strpos($back, '?') !== false ? '&' : '?').'key='.$key;
 if (!empty($back))
 	$smarty->assign('back', Tools::safeOutput($back));
 
@@ -43,13 +47,25 @@ if (Tools::isSubmit('submitAccount'))
 {
 	$create_account = 1;
 	$smarty->assign('email_create', 1);
+	$validateDni = Validate::isDni(Tools::getValue('dni'));
 
 	if (!Validate::isEmail($email = Tools::getValue('email')))
 		$errors[] = Tools::displayError('e-mail not valid');
 	elseif (!Validate::isPasswd(Tools::getValue('passwd')))
 		$errors[] = Tools::displayError('invalid password');
 	elseif (Customer::customerExists($email))
-		$errors[] = Tools::displayError('someone has already registered with this e-mail address');	
+		$errors[] = Tools::displayError('someone has already registered with this e-mail address');
+	elseif (Tools::getValue('dni') != NULL AND $validateDni != 1)
+	{
+		$error = array(
+		0 => Tools::displayError('DNI isn\'t valid'),
+		-1 => Tools::displayError('this DNI has been already used'),
+		-2 => Tools::displayError('NIF isn\'t valid'),
+		-3 => Tools::displayError('CIF isn\'t valid'),
+		-4 => Tools::displayError('NIE isn\'t valid')
+		);
+		$errors[] = $error[$validateDni];
+	}
 	elseif (!@checkdate(Tools::getValue('months'), Tools::getValue('days'), Tools::getValue('years')) AND !(Tools::getValue('months') == '' AND Tools::getValue('days') == '' AND Tools::getValue('years') == ''))
 		$errors[] = Tools::displayError('invalid birthday');
 	else
@@ -60,7 +76,7 @@ if (Tools::isSubmit('submitAccount'))
 			$customer->ip_registration_newsletter = pSQL($_SERVER['REMOTE_ADDR']);
 			$customer->newsletter_date_add = pSQL(date('Y-m-d H:i:s'));
 		}
-		
+
 		$customer->birthday = (empty($_POST['years']) ? '' : intval($_POST['years']).'-'.intval($_POST['months']).'-'.intval($_POST['days']));
 
 		/* Customer and address, same fields, caching data */
@@ -201,7 +217,9 @@ if (isset($create_account))
 	));
 
 	/* Call a hook to display more information on form */
-	$smarty->assign('HOOK_CREATE_ACCOUNT_FORM', Module::hookExec('createAccountForm'));
+	$smarty->assign(array('HOOK_CREATE_ACCOUNT_FORM' => Module::hookExec('createAccountForm'),
+																			'HOOK_CREATE_ACCOUNT_TOP' => Module::hookExec('createAccountTop')
+														));
 }
 
 include(dirname(__FILE__).'/header.php');

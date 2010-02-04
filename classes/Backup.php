@@ -16,7 +16,7 @@ class Backup
 {
 	/** @var integer Object id */
 	public $id;
-	
+
 	/** @var string Last error messages */
 	public $error;
 
@@ -25,9 +25,9 @@ class Backup
 	 *
 	 * @param string $filename Filename of the backup file
 	 */
-	public function __construct( $filename = NULL )
+	public function __construct($filename = NULL)
 	{
-		if ( $filename )
+		if ($filename)
 			$this->id = self::getBackupPath($filename);
 	}
 
@@ -39,23 +39,19 @@ class Backup
 	 */
 	public static function getBackupPath($filename)
 	{
-		$backupdir = realpath( PS_ADMIN_DIR . '/backups/' );
+		$backupdir = realpath(PS_ADMIN_DIR.'/backups/');
 
-		if ( $backupdir === false  )
-		{
-			die ( Tools::displayError('Backups directory does not exist') );
-		}
+		if ($backupdir === false)
+			die(Tools::displayError('Backups directory does not exist'));
 
 		// Check the realpath so we can validate the backup file is under the backup directory
-		$backupfile = realpath( $backupdir . '/' . $filename );
-		if ( $backupfile === false OR strncmp($backupdir, $backupfile, strlen($backupdir)) != 0 )
-		{
-			die ( Tools::displayError('Hack attempt') );
-		}
+		$backupfile = realpath($backupdir.'/'.$filename);
+		if ($backupfile === false OR strncmp($backupdir, $backupfile, strlen($backupdir)) != 0)
+			die (Tools::displayError('Hack attempt'));
 
 		return $backupfile;
 	}
-	
+
 	/**
 	 * Get the URL used to retreive this backup file
 	 *
@@ -66,7 +62,7 @@ class Backup
 		$adminDir = __PS_BASE_URI__.substr($_SERVER['SCRIPT_NAME'], strlen(__PS_BASE_URI__) );
 		$adminDir = substr($adminDir, 0, strrpos($adminDir, '/'));
 
-		return $adminDir . '/backup.php?filename=' . basename ($this->id);
+		return $adminDir.'/backup.php?filename='.basename($this->id);
 	}
 
 	/**
@@ -74,13 +70,13 @@ class Backup
 	 *
 	 * @return boolean Deletion result, true on success
 	 */
-	public function delete() {
-		if ( !$this->id || !unlink ( $this->id ) )
+	public function delete()
+	{
+		if (!$this->id || !unlink($this->id))
 		{
-			$this->error = Tools::displayError('Error deleting') . ' ' . ($this->id ? '"' . $this->id . '"' : Tools::displayError('Invalid ID'));
+			$this->error = Tools::displayError('Error deleting').' '.($this->id ? '"'.$this->id.'"' : Tools::displayError('Invalid ID'));
 			return false;
 		}
-
 		return true;
 	}
 
@@ -89,8 +85,10 @@ class Backup
 	 *
 	 * @return boolean True on success
 	 */
-	public function deleteSelection($list) {
-		foreach ($list as $file) {
+	public function deleteSelection($list)
+	{
+		foreach ($list as $file)
+		{
 			$backup = new Backup($file);
 			if (!$backup->delete())
 			{
@@ -100,7 +98,7 @@ class Backup
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Creates a new backup file
 	 *
@@ -114,6 +112,11 @@ class Backup
 			return false;
 		}
 
+		if (!Configuration::get('PS_BACKUP_ALL'))
+			$ignore_insert_table = array(_DB_PREFIX_.'connections', _DB_PREFIX_.'connections_page', _DB_PREFIX_.'connections_source', _DB_PREFIX_.'guest', _DB_PREFIX_.'statssearch');
+		else
+			$ignore_insert_table = array();
+		
 		// Generate some random number, to make it extra hard to guess backup file names
 		$rand = dechex ( mt_rand(0, min(0xffffffff, mt_getrandmax() ) ) );
 		$date = time();
@@ -141,9 +144,9 @@ class Backup
 
 		$this->id = realpath($backupfile);
 
-		fwrite($fp, '/* Backup for ' . $_SERVER['HTTP_HOST'] . __PS_BASE_URI__ . "\n *  at " . date($date) . "\n */\n");
+		fwrite($fp, '/* Backup for ' . Tools::getHttpHost(false, false) . __PS_BASE_URI__ . "\n *  at " . date($date) . "\n */\n");
 		fwrite($fp, "\n".'SET NAMES \'utf8\';'."\n\n");
-		
+
 		// Find all tables
 		$tables = Db::getInstance()->ExecuteS('SHOW TABLES');
 		$found = 0;
@@ -168,36 +171,45 @@ class Backup
 
 			fwrite($fp, '/* Scheme for table ' . $schema[0]['Table'] . " */\n");
 			fwrite($fp, $schema[0]['Create Table'] . ";\n\n");
-		
-			$data = Db::getInstance()->ExecuteS('SELECT * FROM `' . $schema[0]['Table'] . '`', false);
-			$sizeof = DB::getInstance()->NumRows();
-			if ($data AND $sizeof > 0)
+
+			if (!in_array($schema[0]['Table'], $ignore_insert_table))
 			{
-				// Export the table data
-				fwrite($fp, 'INSERT INTO `' . $schema[0]['Table'] . "` VALUES\n");
-
-				$i = 1;
-				while ($row = DB::getInstance()->nextRow($data))
+				$data = Db::getInstance()->ExecuteS('SELECT * FROM `' . $schema[0]['Table'] . '`', false);
+				$sizeof = DB::getInstance()->NumRows();
+				if ($data AND $sizeof > 0)
 				{
-					$s = '(';
-					foreach ($row as $field => $value)
-						$s .= "'" . mysql_real_escape_string($value) . "',";
-					$s = rtrim($s, ',');
+					// Export the table data
+					fwrite($fp, 'INSERT INTO `' . $schema[0]['Table'] . "` VALUES\n");
 
-					if ($i%200 == 0 AND $i < $sizeof)
-						$s .= ");\nINSERT INTO `".$schema[0]['Table']."` VALUES\n";
-					elseif ($i < $sizeof)
-						$s .= "),\n";
-					else
-						$s .= ");\n";
-					
-					fwrite($fp, $s);
-					++$i;
+					$i = 1;
+					while ($row = DB::getInstance()->nextRow($data))
+					{
+						$s = '(';
+						foreach ($row as $field => $value)
+						{
+							$tmp = "'" . mysql_real_escape_string($value) . "',";
+							if($tmp != "'',")
+								$s .= $tmp;
+							else
+								$s .= "NULL,";
+						}
+						$s = rtrim($s, ',');
+
+						if ($i%200 == 0 AND $i < $sizeof)
+							$s .= ");\nINSERT INTO `".$schema[0]['Table']."` VALUES\n";
+						elseif ($i < $sizeof)
+							$s .= "),\n";
+						else
+							$s .= ");\n";
+
+						fwrite($fp, $s);
+						++$i;
+					}
 				}
 			}
 			$found++;
 		}
-		
+
 		fclose($fp);
 		if ($found == 0)
 		{
@@ -205,8 +217,8 @@ class Backup
 			echo Tools::displayError('No valid tables were found to backup.' );
 			return false;
 		}
-		
+
 		return true;
 	}
-	
+
 }

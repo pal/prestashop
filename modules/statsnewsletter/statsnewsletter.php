@@ -36,15 +36,21 @@ class StatsNewsletter extends ModuleGraph
 		
 	public function hookAdminStatsModules($params)
 	{
-		$totals = $this->getTotals();
+		if(Module::isInstalled('blocknewsletter'))
+		{
+			$totals = $this->getTotals();
+			
+			$this->_html = '
+			<fieldset class="width3"><legend><img src="../modules/'.$this->name.'/logo.gif" /> '.$this->displayName.'</legend>
+				<p>'.$this->l('Registrations from customers:').' '.intval($totals['customers']).'</p>
+				<p>'.$this->l('Registrations from visitors:').' '.intval($totals['visitors']).'</p>
+				<p>'.$this->l('Both:').' '.intval($totals['both']).'</p>
+				<center>'.ModuleGraph::engine(array('type' => 'line', 'layers' => 3)).'</center>
+			</fieldset>';
+		}
+		else
+			$this->_html = '<p>'.$this->l('Module Newsletter Block must be installed').'</p>';
 		
-		$this->_html = '
-		<fieldset class="width3"><legend><img src="../modules/'.$this->name.'/logo.gif" /> '.$this->displayName.'</legend>
-			<p>'.$this->l('Registrations from customers:').' '.intval($totals['customers']).'</p>
-			<p>'.$this->l('Registrations from visitors:').' '.intval($totals['visitors']).'</p>
-			<p>'.$this->l('Both:').' '.intval($totals['both']).'</p>
-			<center>'.ModuleGraph::engine(array('type' => 'line', 'layers' => 3)).'</center>
-		</fieldset>';
 		return $this->_html;
 	}
 
@@ -57,7 +63,7 @@ class StatsNewsletter extends ModuleGraph
 		$result2 = Db::getInstance()->getRow('
 		SELECT COUNT(*) as visitors
 		FROM '._DB_PREFIX_.'newsletter n
-		WHERE n.`date_add` BETWEEN '.ModuleGraph::getDateBetween());
+		WHERE n.`newsletter_date_add` BETWEEN '.ModuleGraph::getDateBetween());
 		return array('customers' => $result1['customers'], 'visitors' => $result2['visitors'], 'both' => $result1['customers'] + $result2['visitors']);
 	}
 		
@@ -73,9 +79,9 @@ class StatsNewsletter extends ModuleGraph
 		FROM `'._DB_PREFIX_.'customer` c
 		WHERE c.`newsletter_date_add` BETWEEN ';
 		$this->_query2 = '
-		SELECT n.date_add
+		SELECT n.newsletter_date_add
 		FROM '._DB_PREFIX_.'newsletter n
-		WHERE n.`date_add` BETWEEN ';
+		WHERE n.`newsletter_date_add` BETWEEN ';
 		$this->setDateGraph($layers, true);
 	}
 	
@@ -87,7 +93,7 @@ class StatsNewsletter extends ModuleGraph
 			$this->_values[0][intval(substr($row['newsletter_date_add'], 5, 2))] += 1;
 		if ($result2)
 			foreach ($result2 AS $row)
-				$this->_values[1][intval(substr($row['date_add'], 5, 2))] += 1;
+				$this->_values[1][intval(substr($row['newsletter_date_add'], 5, 2))] += 1;
 		foreach ($this->_values[2] as $key => $zerofill)
 			$this->_values[2][$key] = $this->_values[0][$key] + $this->_values[1][$key];
 	}
@@ -100,7 +106,7 @@ class StatsNewsletter extends ModuleGraph
 			$this->_values[0][intval(substr($row['newsletter_date_add'], 8, 2))] += 1;
 		if ($result2)
 			foreach ($result2 AS $row)
-				$this->_values[1][intval(substr($row['date_add'], 8, 2))] += 1;
+				$this->_values[1][intval(substr($row['newsletter_date_add'], 8, 2))] += 1;
 		foreach ($this->_values[2] as $key => $zerofill)
 			$this->_values[2][$key] = $this->_values[0][$key] + $this->_values[1][$key];
 	}
@@ -113,7 +119,7 @@ class StatsNewsletter extends ModuleGraph
 			$this->_values[0][intval(substr($row['newsletter_date_add'], 11, 2))] += 1;
 		if ($result2)
 			foreach ($result2 AS $row)
-				$this->_values[1][intval(substr($row['date_add'], 11, 2))] += 1;
+				$this->_values[1][intval(substr($row['newsletter_date_add'], 11, 2))] += 1;
 		foreach ($this->_values[2] as $key => $zerofill)
 			$this->_values[2][$key] = $this->_values[0][$key] + $this->_values[1][$key];
 	}

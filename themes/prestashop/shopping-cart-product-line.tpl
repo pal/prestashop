@@ -16,14 +16,14 @@
 	</td>
 	<td class="cart_unit">
 		<span class="price">
-			{convertPrice price=$product.price} {l s='-Tx'}
+			{if !$priceDisplay}{convertPrice price=$product.price_wt}{else}{convertPrice price=$product.price}{/if}
 		</span>
 	</td>
 	<td class="cart_quantity"{if isset($customizedDatas.$productId.$productAttributeId) AND $quantityDisplayed == 0} style="text-align: center;"{/if}>
 		{if isset($customizedDatas.$productId.$productAttributeId) AND $quantityDisplayed == 0}{$product.customizationQuantityTotal}{/if}
 		{if !isset($customizedDatas.$productId.$productAttributeId) OR $quantityDisplayed > 0}
 			<a class="cart_quantity_delete" href="{$base_dir_ssl}cart.php?delete&amp;id_product={$product.id_product|intval}&amp;ipa={$product.id_product_attribute|intval}&amp;token={$token_cart}" title="{l s='Delete'}"><img src="{$img_dir}icon/delete.gif" alt="{l s='Delete'}" class="icon" /></a>
-		<p>{if $quantityDisplayed == 0 AND isset($customizedDatas.$productId.$productAttributeId)}{$customizedDatas.$productId.$productAttributeId|@count}{else}{$product.quantity-$quantityDisplayed}{/if}</p>
+		<p>{if $quantityDisplayed == 0 AND isset($customizedDatas.$productId.$productAttributeId)}{$customizedDatas.$productId.$productAttributeId|@count}{else}{$product.cart_quantity-$quantityDisplayed}{/if}</p>
 			<a class="cart_quantity_up" href="{$base_dir_ssl}cart.php?add&amp;id_product={$product.id_product|intval}&amp;ipa={$product.id_product_attribute|intval}&amp;token={$token_cart}" title="{l s='Add'}"><img src="{$img_dir}icon/quantity_up.gif" alt="{l s='Add'}" /></a><br />
 			<a class="cart_quantity_down" href="{$base_dir_ssl}cart.php?add&amp;id_product={$product.id_product|intval}&amp;ipa={$product.id_product_attribute|intval}&amp;op=down&amp;token={$token_cart}" title="{l s='Subtract'}"><img src="{$img_dir}icon/quantity_down.gif" alt="{l s='Subtract'}" /></a>
 		{/if}
@@ -31,11 +31,9 @@
 	<td class="cart_total">
 		<span class="price">
 			{if $quantityDisplayed == 0 AND isset($customizedDatas.$productId.$productAttributeId)}
-				{if !$priceDisplay || $priceDisplay == 2}{convertPrice price=$product.total_customization_wt}{if $priceDisplay == 2} {l s='+Tx'}{/if}{/if}{if $priceDisplay == 2}<br />{/if}
-				{if $priceDisplay}{convertPrice price=$product.total_customization}{if $priceDisplay == 2} {l s='-Tx'}{/if}{/if}
+				{if !$priceDisplay}{displayPrice price=$product.total_customization_wt}{else}{displayPrice price=$product.total_customization}{/if}
 			{else}
-				{if !$priceDisplay || $priceDisplay == 2}{convertPrice price=$product.total_wt}{if $priceDisplay == 2} {l s='+Tx'}{/if}{/if}{if $priceDisplay == 2}<br />{/if}
-				{if $priceDisplay}{convertPrice price=$product.total}{if $priceDisplay == 2} {l s='-Tx'}{/if}{/if}
+				{if !$priceDisplay}{displayPrice price=$product.total_wt}{else}{displayPrice price=$product.total}{/if}
 			{/if}
 		</span>
 	</td>

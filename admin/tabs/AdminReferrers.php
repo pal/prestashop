@@ -141,7 +141,7 @@ class AdminReferrers extends AdminTab
 		{
 			echo '
 			<div style="float: left; margin-right: 20px;">
-				'.AdminStatsTab::displayCalendarStatic(array('Calendar' => $this->l('Calendar'), 'Today' => $this->l('Today'), 'Month' => $this->l('Month'), 'Year' => $this->l('Year'))).'
+				'.AdminStatsTab::displayCalendarStatic(array('Calendar' => $this->l('Calendar'), 'Day' => $this->l('Today'), 'Month' => $this->l('Month'), 'Year' => $this->l('Year'))).'
 			</div>';
 			if (!Tools::isSubmit('viewreferrer'))
 				echo '
@@ -211,7 +211,7 @@ class AdminReferrers extends AdminTab
 		$obj = $this->loadObject(true);
 		foreach (array('http_referer_like', 'http_referer_regexp', 'request_uri_like', 'request_uri_regexp') as $field)
 			$obj->{$field} = str_replace('\\', '\\\\', $obj->{$field});
-		$uri = 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__;
+		$uri = Tools::getHttpHost(true, true).__PS_BASE_URI__;
 
 		echo '
 		<form action="'.$currentIndex.'&submitAdd'.$this->table.'=1&token='.$this->token.'" method="post" class="width2">
@@ -235,17 +235,17 @@ class AdminReferrers extends AdminTab
 			<fieldset class="width4"><legend><img src="../img/admin/money.png" /> '.$this->l('Commission plan').'</legend>
 				<label>'.$this->l('Click fee').'</label>
 				<div class="margin-form">
-					<input type="text" size="8" name="click_fee" value="'.number_format($this->getFieldValue($obj, 'click_fee'), 2).'" />
+					<input type="text" size="8" name="click_fee" value="'.number_format(floatval($this->getFieldValue($obj, 'click_fee')), 2).'" />
 					<p>'.$this->l('Fee given for each visit.').'</p>
 				</div>
 				<label>'.$this->l('Base fee').'</label>
 				<div class="margin-form">
-					<input type="text" size="8" name="base_fee" value="'.number_format($this->getFieldValue($obj, 'base_fee'), 2).'" />
+					<input type="text" size="8" name="base_fee" value="'.number_format(floatval($this->getFieldValue($obj, 'base_fee')), 2).'" />
 					<p>'.$this->l('Fee given for each order placed.').'</p>
 				</div>
 				<label>'.$this->l('Percent fee').'</label>
 				<div class="margin-form">
-					<input type="text" size="8" name="percent_fee" value="'.number_format($this->getFieldValue($obj, 'percent_fee'), 2).'" />
+					<input type="text" size="8" name="percent_fee" value="'.number_format(floatval($this->getFieldValue($obj, 'percent_fee')), 2).'" />
 					<p>'.$this->l('Percent of the sales.').'</p>
 				</div>
 			</fieldset>
@@ -279,8 +279,8 @@ class AdminReferrers extends AdminTab
 					<li>
 						'.$this->l('When using the simple mode, you can use some generic characters which can replace any characters:').'
 						<ul>
-							<li>'.$this->l('"_" will replace one character. If you want to use the real "_", you should type "\\\\_".').'</li>
-							<li>'.$this->l('"%" will replace any number of characters. If you want to use the real "%", you should type "\\\\%".').'</li>
+							<li>'.$this->l('"_" will replace one character. If you want to use the real "_", you should type').' "\\\\_".</li>
+							<li>'.$this->l('"%" will replace any number of characters. If you want to use the real "%", you should type').' "\\\\%".</li>
 						</ul>
 					</li>
 					<br />

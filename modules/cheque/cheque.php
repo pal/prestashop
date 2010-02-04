@@ -8,11 +8,11 @@ class Cheque extends PaymentModule
 	public  $chequeName;
 	public  $address;
 
-	function __construct()
+	public function __construct()
 	{
 		$this->name = 'cheque';
 		$this->tab = 'Payment';
-		$this->version = 2.2;
+		$this->version = '2.3';
 		
 		$this->currencies = true;
 		$this->currencies_mode = 'checkbox';
@@ -35,14 +35,14 @@ class Cheque extends PaymentModule
 			$this->warning = $this->l('No currency set for this module');
 	}
 
-	function install()
+	public function install()
 	{
 		if (!parent::install() OR !$this->registerHook('payment') OR !$this->registerHook('paymentReturn'))
 			return false;
 		return true;
-}
+	}
 
-	function uninstall()
+	public function uninstall()
 	{
 		if (!Configuration::deleteByName('CHEQUE_NAME') OR !Configuration::deleteByName('CHEQUE_ADDRESS') OR !parent::uninstall())
 			return false;
@@ -96,7 +96,7 @@ class Cheque extends PaymentModule
 		</form>';
 	}
 
-	function getContent()
+	public function getContent()
 	{
 		$this->_html = '<h2>'.$this->displayName.'</h2>';
 
@@ -118,7 +118,7 @@ class Cheque extends PaymentModule
 		return $this->_html;
 	}
 
-	function execPayment($cart)
+	public function execPayment($cart)
 	{
 		if (!$this->active)
 			return ;
@@ -129,18 +129,18 @@ class Cheque extends PaymentModule
 			'nbProducts' => $cart->nbProducts(),
 			'cust_currency' => $cookie->id_currency,
 			'currencies' => $this->getCurrency(),
-			'total' => number_format($cart->getOrderTotal(true, 3), 2, '.', ''),
+			'total' => $cart->getOrderTotal(true, 3),
 			'isoCode' => Language::getIsoById(intval($cookie->id_lang)),
 			'chequeName' => $this->chequeName,
 			'chequeAddress' => nl2br2($this->address),
 			'this_path' => $this->_path,
-            'this_path_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/'.$this->name.'/'
+            'this_path_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/'
 		));
 
 		return $this->display(__FILE__, 'payment_execution.tpl');
 	}
 
-	function hookPayment($params)
+	public function hookPayment($params)
 	{
 		if (!$this->active)
 			return ;
@@ -149,12 +149,12 @@ class Cheque extends PaymentModule
 
 		$smarty->assign(array(
             'this_path' => $this->_path,
-            'this_path_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/'.$this->name.'/'
+            'this_path_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/'
             ));
 		return $this->display(__FILE__, 'payment.tpl');
 	}
 
-	function hookPaymentReturn($params)
+	public function hookPaymentReturn($params)
 	{
 		if (!$this->active)
 			return ;

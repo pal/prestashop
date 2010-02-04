@@ -13,7 +13,7 @@ class BankWire extends PaymentModule
 	{
 		$this->name = 'bankwire';
 		$this->tab = 'Payment';
-		$this->version = 0.4;
+		$this->version = '0.5';
 		
 		$this->currencies = true;
 		$this->currencies_mode = 'checkbox';
@@ -41,6 +41,7 @@ class BankWire extends PaymentModule
 	{
 		if (!parent::install() OR !$this->registerHook('payment') OR !$this->registerHook('paymentReturn'))
 			return false;
+		return true;
 	}
 
 	public function uninstall()
@@ -50,6 +51,7 @@ class BankWire extends PaymentModule
 				OR !Configuration::deleteByName('BANK_WIRE_ADDRESS')
 				OR !parent::uninstall())
 			return false;
+		return true;
 	}
 
 	private function _postValidation()
@@ -142,13 +144,13 @@ class BankWire extends PaymentModule
 			'nbProducts' => $cart->nbProducts(),
 			'cust_currency' => $cookie->id_currency,
 			'currencies' => $this->getCurrency(),
-			'total' => number_format($cart->getOrderTotal(true, 3), 2, '.', ''),
+			'total' => $cart->getOrderTotal(true, 3),
 			'isoCode' => Language::getIsoById(intval($cookie->id_lang)),
 			'bankwireDetails' => nl2br2($this->details),
 			'bankwireAddress' => nl2br2($this->address),
 			'bankwireOwner' => $this->owner,
 			'this_path' => $this->_path,
-			'this_path_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/'.$this->name.'/'
+			'this_path_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/'
 		));
 
 		return $this->display(__FILE__, 'payment_execution.tpl');
@@ -163,7 +165,7 @@ class BankWire extends PaymentModule
 
 		$smarty->assign(array(
 			'this_path' => $this->_path,
-			'this_path_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/'.$this->name.'/'
+			'this_path_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/'
 		));
 		return $this->display(__FILE__, 'payment.tpl');
 	}

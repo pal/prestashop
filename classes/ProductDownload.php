@@ -143,12 +143,14 @@ class ProductDownload extends ObjectModel
 	{
 		if (array_key_exists($id_product, self::$_productIds))
 			return self::$_productIds[$id_product];
+			
 		$data = Db::getInstance()->getRow('
 		SELECT `id_product_download`
 		FROM `'._DB_PREFIX_.'product_download`
-		WHERE `id_product` = '.intval($id_product).'
-		AND `active` = 1');
-		self::$_productIds[$id_product] = isset($data['id_product_download']) ? $data['id_product_download'] : false;
+		WHERE `id_product` = '.intval($id_product).' AND `active` = 1');
+		
+		self::$_productIds[$id_product] = isset($data['id_product_download']) ? intval($data['id_product_download']) : false;
+		
 		return self::$_productIds[$id_product];
 	}
 
@@ -193,7 +195,7 @@ class ProductDownload extends ObjectModel
 	public function getTextLink($admin=true, $hash=false)
 	{
 		$key = $this->physically_filename . '-' . ($hash ? $hash : 'orderdetail');
-		$link = ($admin) ? './get-file-admin.php?' : 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'get-file.php?';
+		$link = ($admin) ? './get-file-admin.php?' : Tools::getHttpHost(true, true).__PS_BASE_URI__.'get-file.php?';
 		$link .= ($admin) ? 'file='.$this->physically_filename : 'key='.$key;
 		return $link;
 	}
@@ -245,11 +247,11 @@ class ProductDownload extends ObjectModel
 	 *
 	 * @return string Sha1 unique filename
 	 */
-	function getNewFilename()
+	static public function getNewFilename()
 	{
 		$ret = sha1(microtime());
 		if (file_exists(_PS_DOWNLOAD_DIR_.$ret))
-			$ret = $this->getNewFilename();
+			$ret = ProductDownload::getNewFilename();
 		return $ret;
 	}
 

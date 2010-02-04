@@ -1,17 +1,15 @@
 <?php
 
-/* Improve PHP configuration to prevent issues */
+/* Debug only */
 @ini_set('display_errors', 'off');
+define('_PS_DEBUG_SQL_', false);
+
+/* Improve PHP configuration to prevent issues */
 @ini_set('upload_max_filesize', '100M');
 @ini_set('default_charset', 'utf-8');
 
 /* Correct Apache charset */
 header('Content-Type: text/html; charset=utf-8');
-
-/*
- * It is not safe to rely on the system's timezone settings, but we can\'t easily determine the user timezone and the use of this function cause trouble for some configurations.
- * This will generate a PHP Strict Standards notice. To fix it up, uncomment the following line.
- */
 
 /* Autoload */
 function __autoload($className)
@@ -99,7 +97,7 @@ define('_PS_MIN_TIME_GENERATE_PASSWD_', '360');
 
 /* aliases */
 function p($var) {
-	Tools::p($var);
+	return (Tools::p($var));
 }
 function d($var) {
 	Tools::d($var);
@@ -124,7 +122,12 @@ define('PS_STATE_TAX', 1);
 define('PS_BOTH_TAX', 2);
 
 define('_PS_PRICE_DISPLAY_PRECISION_', 2);
+define('PS_TAX_EXC', 1);
+define('PS_TAX_INC', 0);
 
+define('PS_ROUND_UP', 0);
+define('PS_ROUND_DOWN', 1);
+define('PS_ROUND_HALF', 2);
 
 global $_MODULES;
 $_MODULES = array();
@@ -144,11 +147,16 @@ Tax::loadTaxZones();
 /* Loading default country */
 $defaultCountry = new Country(intval(Configuration::get('PS_COUNTRY_DEFAULT')));
 
-/* Define default timezone */
-$timezone = Tools::getTimezones(Configuration::get('PS_TIMEZONE'));
 
+/*
+ * It is not safe to rely on the system's timezone settings, but we can\'t easily determine the user timezone and the use of this function cause trouble for some configurations.
+ * This will generate a PHP Strict Standards notice. To fix it up, uncomment the following line.
+ */
 if (function_exists('date_default_timezone_set'))
+{
+	$timezone = Tools::getTimezones(Configuration::get('PS_TIMEZONE'));
 	date_default_timezone_set($timezone);
+}
 
 /* Smarty */
 include(dirname(__FILE__).'/smarty.config.inc.php');

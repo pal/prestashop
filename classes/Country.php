@@ -28,6 +28,9 @@ class		Country extends ObjectModel
 	/** @var boolean Contain states */
 	public		$contains_states;
 
+	/** @var boolean Need identification number dni/nif/nie */
+	public		$need_identification_number;
+	
 	/** @var boolean Status for delivery */
 	public		$active = true;
 
@@ -35,9 +38,9 @@ class		Country extends ObjectModel
 
 	protected 	$tables = array ('country', 'country_lang');
 
- 	protected 	$fieldsRequired = array('id_zone', 'iso_code', 'contains_states');
+ 	protected 	$fieldsRequired = array('id_zone', 'iso_code', 'contains_states', 'need_identification_number');
  	protected 	$fieldsSize = array('iso_code' => 3);
- 	protected 	$fieldsValidate = array('id_zone' => 'isUnsignedId', 'iso_code' => 'isLanguageIsoCode', 'active' => 'isBool', 'contains_states' => 'isBool');
+ 	protected 	$fieldsValidate = array('id_zone' => 'isUnsignedId', 'iso_code' => 'isLanguageIsoCode', 'active' => 'isBool', 'contains_states' => 'isBool', 'need_identification_number' => 'isBool');
  	protected 	$fieldsRequiredLang = array('name');
  	protected 	$fieldsSizeLang = array('name' => 64);
  	protected 	$fieldsValidateLang = array('name' => 'isGenericName');
@@ -52,6 +55,7 @@ class		Country extends ObjectModel
 		$fields['iso_code'] = pSQL(strtoupper($this->iso_code));
 		$fields['active'] = intval($this->active);
 		$fields['contains_states'] = intval($this->contains_states);
+		$fields['need_identification_number'] = intval($this->need_identification_number);
 		return $fields;
 	}
 
@@ -81,6 +85,7 @@ class		Country extends ObjectModel
 		$states = Db::getInstance()->ExecuteS('
 		SELECT s.*
 		FROM `'._DB_PREFIX_.'state` s
+		ORDER BY s.`name` ASC
 		');
 
 		$result = Db::getInstance()->ExecuteS('
@@ -155,6 +160,22 @@ class		Country extends ObjectModel
         return $result['name'];
     }
     
+	/**
+	* Get a country iso with its ID
+	*
+	* @param integer $id_country Country ID
+	* @return string Country iso
+	*/
+	static public function getIsoById($id_country)
+    {
+	    $result = Db::getInstance()->getRow('
+		SELECT `iso_code`
+		FROM `'._DB_PREFIX_.'country`
+		WHERE `id_country` = '.intval($id_country));
+
+        return $result['iso_code'];
+    }
+	
 	/**
 	* Get a country id with its name
 	*

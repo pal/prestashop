@@ -22,8 +22,8 @@ class AdminAppearance extends AdminPreferences
 		$this->table = 'configuration';
 
  		$this->_fieldsAppearance = array(
-			'PS_LOGO' => array('title' => $this->l('Header logo:'), 'desc' => $this->l('Will appear on page and e-mail headers'), 'type' => 'file', 'thumb' => array('file' => _PS_IMG_.'logo.jpg', 'pos' => 'before')),
-			'PS_FAVICON' => array('title' => $this->l('Favicon:'), 'desc' => $this->l('The favicon used by your shop'), 'type' => 'file', 'thumb' => array('file' => _PS_IMG_.'favicon.ico', 'pos' => 'after')),
+			'PS_LOGO' => array('title' => $this->l('Header logo:'), 'desc' => $this->l('Will appear on page and e-mail headers'), 'type' => 'file', 'thumb' => array('file' => _PS_IMG_.'logo.jpg?date='.time(), 'pos' => 'before')),
+			'PS_FAVICON' => array('title' => $this->l('Favicon:'), 'desc' => $this->l('The favicon used by your shop'), 'type' => 'file', 'thumb' => array('file' => _PS_IMG_.'favicon.ico?date='.time(), 'pos' => 'after')),
 			'PS_NAVIGATION_PIPE' => array('title' => $this->l('Navigation pipe:'), 'desc' => $this->l('Used for navigation path inside categories/product'), 'cast' => 'strval', 'type' => 'text', 'size' => 20),
 		);
 		$this->_fieldsTheme = array(
@@ -34,12 +34,22 @@ class AdminAppearance extends AdminPreferences
 
 	public function display()
 	{
+		global $currentIndex;
+		
 		// No cache for auto-refresh uploaded logo
 		header('Cache-Control: no-cache, must-revalidate');
 		header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
 		$this->_displayForm('appearance', $this->_fieldsAppearance, $this->l('Appearance'), 'width3', 'appearance');
 		echo '<br /><br />';
 		$this->_displayForm('themes', $this->_fieldsTheme, $this->l('Themes'), 'width3', 'themes');
+		echo '<br /><br />';
+		if (@ini_get('allow_url_fopen'))
+			echo '<script type="text/javascript">
+				$.post("'.dirname($currentIndex).'/ajax.php",{page:"themes"},function(a){getE("prestastore-content").innerHTML="<legend><img src=\"../img/admin/prestastore.gif\" class=\"middle\" /> '.$this->l('Live from PrestaStore!').'</legend>"+a;});
+			</script>
+			<fieldset id="prestastore-content" class="width3"></fieldset>';			
+		else
+			echo '<a href="http://www.prestastore.com/3-prestashop-themes">'.$this->l('Find new themes on PrestaStore!').'</a>';
 	}
 	
 	/**

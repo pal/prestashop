@@ -36,13 +36,9 @@ class		Language extends ObjectModel
 	private static $_checkedLangs;
 	private static $_LANGUAGES;
 	
-	public	function __construct($id_address = NULL, $id_lang = NULL)
+	public	function __construct($id = NULL, $id_lang = NULL)
 	{
-		parent::__construct($id_address);
-		
-		// Check if all files needed are here, if not, disabled language
-		if ($this->iso_code != 'en' AND !$this->checkFiles())
-			$this->active = false;
+		parent::__construct($id);
 	}
 	
 	public function checkFiles()
@@ -91,6 +87,7 @@ class		Language extends ObjectModel
 			'order_canceled.html',			'order_canceled.txt',
 			'order_conf.html',				'order_conf.txt',
 			'order_customer_comment.html',	'order_customer_comment.txt',
+			'order_merchant_comment.html',	'order_merchant_comment.txt',
 			'order_return_state.html',		'order_return_state.txt',
 			'outofstock.html',				'outofstock.txt',
 			'password.html',				'password.txt',
@@ -206,14 +203,20 @@ class		Language extends ObjectModel
 	
 	public function delete()
 	{
-		// Database translations deletion
+		/* Database translations deletion */
 		$result = Db::getInstance()->ExecuteS('SHOW TABLES FROM `'._DB_NAME_.'`');
 		foreach ($result AS $row)
 			if (preg_match('/_lang/', $row['Tables_in_'._DB_NAME_]))
 				if (!Db::getInstance()->Execute('DELETE FROM `'.$row['Tables_in_'._DB_NAME_].'` WHERE `id_lang` = '.intval($this->id)))
 					return false;
+					
+		/* Delete tags */
+		Db::getInstance()->Execute('DELETE FROM '._DB_PREFIX_.'tag WHERE id_lang = '.intval($this->id));
+		
+		/* Delete search words */
+		Db::getInstance()->Execute('DELETE FROM '._DB_PREFIX_.'search_word WHERE id_lang = '.intval($this->id));
 
-		//Files deletion
+		/* Files deletion */
 		foreach (self::getFilesList($this->iso_code, _THEME_NAME_, false, false, false, true, true) as $key => $file)
 			unlink($key);
 		if (file_exists(_PS_MAIL_DIR_.$this->iso_code))
@@ -320,15 +323,13 @@ class		Language extends ObjectModel
 	static public function loadLanguages()
 	{
 		self::$_LANGUAGES = array();
-		$result = Db::getInstance()->ExecuteS('SELECT `id_lang`, `name`, `iso_code`, `active` FROM `'._DB_PREFIX_.'lang`');
-		if ($result === false)
-			die(Tools::displayError('Invalid loadLanguage() SQL query!'));
+		
+		$result = Db::getInstance()->ExecuteS('
+		SELECT `id_lang`, `name`, `iso_code`, `active` 
+		FROM `'._DB_PREFIX_.'lang`');
+		
 		foreach ($result AS $row)
-		{
-			if (!self::checkFilesWithIsoCode($row['iso_code']))
-				$row['active'] = 0;
 			self::$_LANGUAGES[intval($row['id_lang'])] = array('id_lang' => intval($row['id_lang']), 'name' => $row['name'], 'iso_code' => $row['iso_code'], 'active' => intval($row['active']));
-		}
 	}
 }
 

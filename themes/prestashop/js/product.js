@@ -224,7 +224,7 @@ function updateDisplay()
 	{
 		var attribut_price_tmp = selectedCombination['price'];
 
-		var tax = noTaxForThisProduct ? 1 : ((taxRate / 100) + 1);
+		var tax = (taxRate / 100) + 1;
 
 		if (noTaxForThisProduct)
 			attribut_price_tmp /= tax;
@@ -237,7 +237,7 @@ function updateDisplay()
 		else
 			$('#product_reference:visible').hide('slow');
 
-		var productPriceWithoutReduction2 = (attribut_price_tmp + productPriceWithoutReduction) * currencyRate;
+		var productPriceWithoutReduction2 = (attribut_price_tmp + productPriceWithoutReduction);
 		
 		if (reduction_from != reduction_to && (currentDate > reduction_to || currentDate < reduction_from))
 			var priceReduct = 0;
@@ -253,7 +253,11 @@ function updateDisplay()
 		}
 
 		if (group_reduction)
+		{
 			priceProduct *= group_reduction;
+			productPricePretaxed *= group_reduction;
+		}
+		
 		$('#our_price_display').text(formatCurrency(priceProduct, currencyFormat, currencySign, currencyBlank));
 		$('#pretaxe_price_display').text(formatCurrency(productPricePretaxed, currencyFormat, currencySign, currencyBlank));
 		$('#old_price_display').text(formatCurrency(productPriceWithoutReduction2, currencyFormat, currencySign, currencyBlank));

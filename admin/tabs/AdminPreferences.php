@@ -31,11 +31,26 @@ class AdminPreferences extends AdminTab
 		$taxes[] = array('id' => 0, 'name' => $this->l('None'));
 		foreach ($txs as $tax)
 			$taxes[] = array('id' => $tax['id_tax'], 'name' => $tax['name']);
+		
+		$round_mode = array(
+			array(
+				'value' => PS_ROUND_UP,
+				'name' => $this->l('superior')
+			),
+			array(
+				'value' => PS_ROUND_DOWN,
+				'name' => $this->l('inferior')
+			),
+			array(
+				'value' => PS_ROUND_HALF,
+				'name' => $this->l('classical')
+			)
+		);
 
 		$this->_fieldsGeneral = array(
 			'PS_BASE_URI' => array('title' => $this->l('PS directory:'), 'desc' => $this->l('Name of the PrestaShop directory on your Web server, bracketed by forward slashes (e.g., /shop/)'), 'validation' => 'isGenericName', 'type' => 'text', 'size' => 20, 'default' => '/'),
 			'PS_SHOP_ENABLE' => array('title' => $this->l('Enable Shop:'), 'desc' => $this->l('Activate or deactivate your shop. Deactivate your shop while you perform maintenance on it'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool'),
-			'PS_MAINTENANCE_IP' => array('title' => $this->l('Maintenance IP:'), 'desc' => $this->l('IP address allowed to access the Front Office while the shop is disabled (e.g., 42.24.4.2)'), 'validation' => 'isGenericName', 'type' => 'text', 'size' => 15, 'default' => ''),
+			'PS_MAINTENANCE_IP' => array('title' => $this->l('Maintenance IP:'), 'desc' => $this->l('IP addresses allowed to access the Front Office even if shop is disabled. Use coma to separate them (e.g., 42.24.4.2,127.0.0.1,99.98.97.96)'), 'validation' => 'isGenericName', 'type' => 'text', 'size' => 15, 'default' => ''),
 			'PS_SSL_ENABLED' => array('title' => $this->l('Enable SSL'), 'desc' => $this->l('If your hosting provider allows SSL, you can activate SSL encryption (https://) for customer account identification and order processing'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool', 'default' => '0'),
 			'PS_TOKEN_ENABLE' => array('title' => $this->l('Increase Front Office security'), 'desc' => $this->l('Enable or disable token on the Front Office in order to improve PrestaShop security'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool', 'default' => '0'),
 			'PS_REWRITING_SETTINGS' => array('title' => $this->l('Friendly URL:'), 'desc' => $this->l('Enable only if your server allows URL rewriting (recommended)').'<p class="hint clear" style="display: block;">'.$this->l('If you turn on this feature, you must').' <a href="?tab=AdminGenerator&token='.Tools::getAdminToken('AdminGenerator'.intval(Tab::getIdFromClassName('AdminGenerator')).intval($cookie->id_employee)).'">'.$this->l('generate a .htaccess file').'</a></p><div class="clear"></div>', 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool'),
@@ -45,7 +60,9 @@ class AdminPreferences extends AdminTab
 			'PS_GIFT_WRAPPING_PRICE' => array('title' => $this->l('Gift-wrapping price:'), 'desc' => $this->l('Set a price for gift-wrapping'), 'validation' => 'isPrice', 'cast' => 'floatval', 'type' => 'price'),
 			'PS_GIFT_WRAPPING_TAX' => array('title' => $this->l('Gift-wrapping tax:'), 'desc' => $this->l('Set a tax for gift-wrapping'), 'validation' => 'isInt', 'cast' => 'intval', 'type' => 'select', 'list' => $taxes, 'identifier' => 'id'),
 			'PS_RECYCLABLE_PACK' => array('title' => $this->l('Offer recycled packaging:'), 'desc' => $this->l('Suggest recycled packaging to customer'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool'),
-			'PS_CART_FOLLOWING' => array('title' => $this->l('Cart re-display at login:'), 'desc' => $this->l('After customer logs in, recall and display contents of his/her last shopping cart'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool'));
+			'PS_CART_FOLLOWING' => array('title' => $this->l('Cart re-display at login:'), 'desc' => $this->l('After customer logs in, recall and display contents of his/her last shopping cart'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool'),
+			'PS_PRICE_ROUND_MODE' => array('title' => $this->l('Round mode:'), 'desc' => $this->l('You can choose the rounding of prices, rounding always superior, inferior or classical rounding.'), 'validation' => 'isInt', 'cast' => 'intval', 'type' => 'select', 'list' => $round_mode, 'identifier' => 'value'),
+			'PRESTASTORE_LIVE' => array('title' => $this->l('Automatically check updates to modules'), 'desc' => $this->l('New modules and updates are displayed on the modules page'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool'));
 			if (function_exists('date_default_timezone_set'))
 				$this->_fieldsGeneral['PS_TIMEZONE'] = array('title' => $this->l('Timezone:'), 'validation' => 'isUnsignedId', 'cast' => 'intval', 'type' => 'select', 'list' => $timezone, 'identifier' => 'id');
 			$this->_fieldsGeneral['PS_THEME_V11'] = array('title' => $this->l('v1.1 theme compatibility:'), 'desc' => $this->l('My shop use a PrestaShop v1.1 theme (SSL will generate warnings in customer browser)'), 'validation' => 'isBool', 'cast' => 'intval', 'type' => 'bool');

@@ -41,9 +41,9 @@ var removingLinkText = '{l s='remove this product from my cart' mod='blockcart' 
 			{assign var='productAttributeId' value=$product.id_product_attribute}
 			<dt id="cart_block_product_{$product.id_product}{if $product.id_product_attribute}_{$product.id_product_attribute}{/if}" class="{if $smarty.foreach.myLoop.first}first_item{elseif $smarty.foreach.myLoop.last}last_item{else}item{/if}">
 				<span class="quantity-formated"><span class="quantity">{$product.cart_quantity}</span>x</span>
-				<a class="cart_block_product_name" href="{$link->getProductLink($product.id_product, $product.link_rewrite, $product.category)}" title="{$product.name|escape:htmlall:'UTF-8'}">{t text=$product.name length='16' encode='true'}</a>
+				<a class="cart_block_product_name" href="{$link->getProductLink($product.id_product, $product.link_rewrite, $product.category)}" title="{$product.name|escape:html:'UTF-8'}">{t text=$product.name length='13' encode='true'}</a>
 				<span class="remove_link">{if !isset($customizedDatas.$productId.$productAttributeId)}<a class="ajax_cart_block_remove_link" href="{$base_dir}cart.php?delete&amp;id_product={$product.id_product}&amp;ipa={$product.id_product_attribute}&amp;token={$static_token}" title="{l s='remove this product from my cart' mod='blockcart'}">&nbsp;</a>{/if}</span>
-				<span class="price">{displayWtPrice p="`$product.real_price`"}</span>
+				<span class="price">{if $priceDisplay == $smarty.const.PS_TAX_EXC}{displayWtPrice p="`$product.total`"}{else}{displayWtPrice p="`$product.total_wt`"}{/if}</span>
 			</dt>
 			{if isset($product.attributes_small)}
 			<dd id="cart_block_combination_of_{$product.id_product}{if $product.id_product_attribute}_{$product.id_product_attribute}{/if}" class="{if $smarty.foreach.myLoop.first}first_item{elseif $smarty.foreach.myLoop.last}last_item{else}item{/if}">
@@ -79,7 +79,7 @@ var removingLinkText = '{l s='remove this product from my cart' mod='blockcart' 
 			{foreach from=$discounts item=discount}
 				<tr id="bloc_cart_voucher_{$discount.id_discount}">
 					<td class="name" title="{$discount.description}">{$discount.name|cat:' : '|cat:$discount.description|truncate:18:'...'|escape:'htmlall':'UTF-8'}</td>
-					<td class="price">-{if $priceDisplay == 1}{convertPrice price=$discount.value_tax_exc}{else}{convertPrice price=$discount.value_real}{/if}</td>
+					<td class="price">-{if $discount.value_real != '!'}{if $priceDisplay == 1}{convertPrice price=$discount.value_tax_exc}{else}{convertPrice price=$discount.value_real}{/if}{/if}</td>
 					<td class="delete"><a href="{$base_dir_ssl}order.php?deleteDiscount={$discount.id_discount}" title="{l s='Delete'}"><img src="{$img_dir}icon/delete.gif" alt="{l s='Delete'}" class="icon" /></a></td>
 				</tr>
 			{/foreach}

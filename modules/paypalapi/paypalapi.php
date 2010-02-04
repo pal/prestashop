@@ -10,6 +10,7 @@ class PaypalAPI extends PaymentModule
 	protected	$_apiSignature;
 	protected	$_sandbox;
 	protected	$_expressCheckout;
+	protected	$_pp_integral;
 
 	public function __construct()
 	{
@@ -33,7 +34,7 @@ class PaypalAPI extends PaymentModule
 
 	protected function _init()
 	{
-		$config = Configuration::getMultiple(array('PAYPAL_HEADER', 'PAYPAL_SANDBOX', 'PAYPAL_API_USER', 'PAYPAL_API_PASSWORD', 'PAYPAL_API_SIGNATURE', 'PAYPAL_EXPRESS_CHECKOUT'));
+		$config = Configuration::getMultiple(array('PAYPAL_HEADER', 'PAYPAL_SANDBOX', 'PAYPAL_API_USER', 'PAYPAL_API_PASSWORD', 'PAYPAL_API_SIGNATURE', 'PAYPAL_EXPRESS_CHECKOUT', 'PAYPAL_INTEGRAL', 'PAYPAL_OPTION_PLUS'));
 		if (isset($config['PAYPAL_HEADER']))
 			$this->_header = $config['PAYPAL_HEADER'];
 		if (isset($config['PAYPAL_SANDBOX']))
@@ -46,6 +47,8 @@ class PaypalAPI extends PaymentModule
 			$this->_apiSignature = $config['PAYPAL_API_SIGNATURE'];
 		if (isset($config['PAYPAL_EXPRESS_CHECKOUT']))
 			$this->_expressCheckout = $config['PAYPAL_EXPRESS_CHECKOUT'];
+		if (isset($config['PAYPAL_INTEGRAL']))
+			$this->_pp_integral = $config['PAYPAL_INTEGRAL'];
 	}
 
 	public function install()
@@ -68,12 +71,14 @@ class PaypalAPI extends PaymentModule
 			OR !Configuration::updateValue('PAYPAL_API_USER', 0)
 			OR !Configuration::updateValue('PAYPAL_API_PASSWORD', 0)
 			OR !Configuration::updateValue('PAYPAL_API_SIGNATURE', 0)
-			OR !Configuration::deleteByName('PAYPAL_EXPRESS_CHECKOUT', 0)
+			OR !Configuration::updateValue('PAYPAL_EXPRESS_CHECKOUT', 0)
+			OR !Configuration::updateValue('PAYPAL_INTEGRAL', 0)
 			OR !$this->registerHook('payment')
 			OR !$this->registerHook('shoppingCartExtra')
 			OR !$this->registerHook('backBeforePayment')
 			OR !$this->registerHook('paymentReturn')
-			)
+			OR !$this->registerHook('rightColumn')
+			OR !$this->registerHook('header'))
 			return false;
 		return true;
 	}
@@ -86,7 +91,9 @@ class PaypalAPI extends PaymentModule
 			OR !Configuration::deleteByName('PAYPAL_API_USER')
 			OR !Configuration::deleteByName('PAYPAL_API_PASSWORD')
 			OR !Configuration::deleteByName('PAYPAL_API_SIGNATURE')
-			OR !Configuration::deleteByName('PAYPAL_EXPRESS_CHECKOUT'))
+			OR !Configuration::deleteByName('PAYPAL_EXPRESS_CHECKOUT')
+			OR !Configuration::deleteByName('PAYPAL_INTEGRAL')
+			)
 			return false;
 		return true;
 	}
@@ -149,7 +156,7 @@ class PaypalAPI extends PaymentModule
 
 	public function getContent()
 	{
-		include(_PS_MODULE_DIR_.'/paypalapi/admin/PaypalAdmin.php');
+		include(_PS_MODULE_DIR_.'paypalapi/admin/paypaladmin.php');
 		$ppAdmin = new PaypalAdmin();
 		return $ppAdmin->home();
 	}
@@ -163,7 +170,7 @@ class PaypalAPI extends PaymentModule
 		if (!$this->active)
 			return ;
 
-		include(_PS_MODULE_DIR_.'/paypalapi/payment/PaypalPayment.php');
+		include(_PS_MODULE_DIR_.'paypalapi/payment/paypalpayment.php');
 		$ppPayment = new PaypalPayment();
 		return $ppPayment->home($params);
 	}
@@ -177,7 +184,7 @@ class PaypalAPI extends PaymentModule
 
 		if (Configuration::get('PAYPAL_EXPRESS_CHECKOUT') AND !$cookie->isLogged())
 		{
-			include(_PS_MODULE_DIR_.'/paypalapi/express/PaypalExpress.php');
+			include(_PS_MODULE_DIR_.'paypalapi/express/paypalexpress.php');
 			$ppExpress = new PaypalExpress();
 			return $ppExpress->home($params);
 		}
@@ -214,6 +221,37 @@ class PaypalAPI extends PaymentModule
 		else
 			$smarty->assign('status', 'failed');
 		return $this->display(__FILE__, 'payment_return.tpl');
+	}
+
+	function hookRightColumn($params)
+	{
+		global $smarty, $cookie, $js_files, $css_files;
+
+		$js_files = array(_PS_JS_DIR_.'jquery/thickbox-modified.js');
+		$css_files = array(__PS_BASE_URI__.'css/thickbox.css' => 'all');
+		$iso_code = Tools::strtoupper(Language::getIsoById($cookie->id_lang ? intval($cookie->id_lang) : 1));
+		if (!$this->_pp_integral)
+			$logo = _MODULE_DIR_.$this->name.'/img/PayPal_mark_60x38.gif';
+		else
+		{
+			if ($iso_code == 'FR')
+				$logo = _MODULE_DIR_.$this->name.'/img/vertical_FR_large.png';
+			else
+				$logo = _MODULE_DIR_.$this->name.'/img/vertical_US_large.png';
+		}
+		$smarty->assign('iso_code', Tools::strtolower($iso_code));
+		$smarty->assign('logo', $logo);
+		return $this->display(__FILE__, 'column.tpl');
+	}
+
+	function hookLeftColumn($params)
+	{
+		return $this->hookRightColumn($params);
+	}
+
+	function hookHeader($params)
+	{
+		return $this->display(__FILE__, 'header.tpl');
 	}
 
 	/************************************************************/
@@ -253,6 +291,8 @@ class PaypalAPI extends PaymentModule
 
 	public function validOrder($cookie, $cart, $id_currency, $payerID, $type)
 	{
+		global $cookie;
+
 		if (!$this->active)
 			return ;
 
@@ -261,18 +301,31 @@ class PaypalAPI extends PaymentModule
 		$currency = new Currency(intval($id_currency));
 		$iso_currency = $currency->iso_code;
 		$token = strval($cookie->paypal_token);
-		$total = number_format(floatval($cart->getOrderTotal(true, 3)), 2, '.', '');
+		$total = floatval($cart->getOrderTotal(true, 3));
 		$payerID = strval($payerID);
 		$paymentType = 'Sale';
 		$serverName = urlencode($_SERVER['SERVER_NAME']);
 		$bn = ($type == 'express' ? 'ECS' : 'ECM');
-		$notifyURL = urlencode('http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/paypalapi/ipn.php');
+		$notifyURL = urlencode('http://'.Tools::getHttpHost(false, true).__PS_BASE_URI__.'modules/paypalapi/ipn.php');
+
+		// Getting address
+		if (isset($cookie->id_cart) AND $cookie->id_cart)
+			$cart = new Cart(intval($cookie->id_cart));
+		if (isset($cart->id_address_delivery) AND $cart->id_address_delivery)
+			$address = new Address(intval($cart->id_address_delivery));
+		$requestAddress = '';
+		if (Validate::isLoadedObject($address))
+		{
+			$country = new Country(intval($address->id_country));
+			$state = new State(intval($address->id_state));
+			$requestAddress = '&SHIPTONAME='.urlencode($address->company.' '.$address->lastname.' '.$address->firstname).'&SHIPTOSTREET='.urlencode($address->address1.' '.$address->address2).'&SHIPTOCITY='.urlencode($address->city).'&SHIPTOSTATE='.urlencode($state->iso_code).'&SHIPTOCOUNTRYCODE='.urlencode($country->iso_code).'&SHIPTOZIP='.urlencode($address->postcode);
+		}
 
 		// Making request
-		$request='&TOKEN='.urlencode($token).'&PAYERID='.urlencode($payerID).'&PAYMENTACTION='.$paymentType.'&AMT='.$total.'&CURRENCYCODE='.$iso_currency.'&IPADDRESS='.$serverName.'&NOTIFYURL='.$notifyURL.'&BUTTONSOURCE=PRESTASHOP_'.$bn;
+		$request='&TOKEN='.urlencode($token).'&PAYERID='.urlencode($payerID).'&PAYMENTACTION='.$paymentType.'&AMT='.$total.'&CURRENCYCODE='.$iso_currency.'&IPADDRESS='.$serverName.'&NOTIFYURL='.$notifyURL.'&BUTTONSOURCE=PRESTASHOP_'.$bn.$requestAddress ;
 
 		// Calling PayPal API
-		include(_PS_MODULE_DIR_.'paypalapi/api/PaypalLib.php');
+		include(_PS_MODULE_DIR_.'paypalapi/api/paypallib.php');
 		$ppAPI = new PaypalLib();
 		$result = $ppAPI->makeCall($this->getAPIURL(), $this->getAPIScript(), 'DoExpressCheckoutPayment', $request);
 		$this->_logs = array_merge($this->_logs, $ppAPI->getLogs());
@@ -314,5 +367,73 @@ class PaypalAPI extends PaymentModule
 
 		// Displaying output
 		$this->displayFinal($id_cart);
+	}
+
+	public function getCountryCode()
+	{
+		global $cookie;
+
+		$cart = new Cart(intval($cookie->id_cart));
+		$address = new Address(intval($cart->id_address_invoice));
+		$country = new Country(intval($address->id_country));
+		return $country->iso_code;
+	}
+
+	public function getLocaleCode()
+	{
+		global $cookie;
+
+		return Language::getIsoById(intval($cookie->id_lang)).'_'.Tools::strtoupper($this->getCountryCode());
+	}
+	
+	public function getLogo($ppExpress = false)
+	{
+		global $cookie;
+
+		if ($ppExpress)
+		{
+			$iso_code = Tools::strtoupper(Language::getIsoById($cookie->id_lang ? intval($cookie->id_lang) : 1));
+			$logo = array(
+				'FR' => _MODULE_DIR_.$this->name.'/img/FR_pp_express.gif',
+				'DE' => _MODULE_DIR_.$this->name.'/img/DE_pp_express.gif',
+				'US' => _MODULE_DIR_.$this->name.'/img/US_pp_express.gif',
+				'UK' => _MODULE_DIR_.$this->name.'/img/UK_pp_express.gif',
+				'ES' => _MODULE_DIR_.$this->name.'/img/ES_pp_express.gif',
+				'IT' => _MODULE_DIR_.$this->name.'/img/IT_pp_express.gif',
+				'PL' => _MODULE_DIR_.$this->name.'/img/PL_pp_express.gif',
+				'NL' => _MODULE_DIR_.$this->name.'/img/NL_pp_express.gif',
+				'AU' => _MODULE_DIR_.$this->name.'/img/AU_pp_express.gif',
+				'CA' => _MODULE_DIR_.$this->name.'/img/CA_pp_express.gif',
+				'CN' => _MODULE_DIR_.$this->name.'/img/CN_pp_express.gif',
+				'JP' => _MODULE_DIR_.$this->name.'/img/JP_pp_express.gif'
+			);
+			if (isset($logo[$iso_code]))
+				return $logo[$iso_code];
+			return $logo['US'];
+		}
+
+		if ($this->_pp_integral)
+		{
+			$country_code = $this->getCountryCode();
+			$logo = array(
+				'FR' => _MODULE_DIR_.$this->name.'/img/FR_pp_integral.gif',
+				'DE' => _MODULE_DIR_.$this->name.'/img/DE_pp_integral.gif',
+				'US' => _MODULE_DIR_.$this->name.'/img/US_pp_integral.gif',
+				'UK' => _MODULE_DIR_.$this->name.'/img/UK_pp_integral.gif',
+				'ES' => _MODULE_DIR_.$this->name.'/img/ES_pp_integral.gif',
+				'IT' => _MODULE_DIR_.$this->name.'/img/IT_pp_integral.gif',
+				'PL' => _MODULE_DIR_.$this->name.'/img/PL_pp_integral.gif',
+				'NL' => _MODULE_DIR_.$this->name.'/img/NL_pp_integral.gif',
+				'AU' => _MODULE_DIR_.$this->name.'/img/AU_pp_integral.gif',
+				'CA' => _MODULE_DIR_.$this->name.'/img/CA_pp_integral.gif',
+				'CN' => _MODULE_DIR_.$this->name.'/img/CN_pp_integral.gif',
+				'JP' => _MODULE_DIR_.$this->name.'/img/JP_pp_integral.gif'
+			);
+			if (isset($logo[$country_code]))
+				return $logo[$country_code];
+			return $logo['US'];
+		}
+		else
+			return _MODULE_DIR_.$this->name.'/img/PayPal_mark_60x38.gif';
 	}
 }

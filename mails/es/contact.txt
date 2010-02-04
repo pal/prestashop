@@ -1,0 +1,15 @@
+Hola {firstname} {lastname},
+
+Has recibido un mensaje de un cliente desde tu tienda: {shop_name}
+
+Detalles del mensaje:
+
+Email: {email}
+
+Mensaje:
+
+{message}
+
+
+
+{shop_url} desarrollado por PrestaShop®

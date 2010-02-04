@@ -8,11 +8,12 @@
 // <![CDATA[
 idSelectedCountry = {if isset($smarty.post.id_state)}{$smarty.post.id_state|intval}{else}false{/if};
 countries = new Array();
+countriesNeedIDNumber = new Array();
 {foreach from=$countries item='country'}
 	{if isset($country.states)}
 		countries[{$country.id_country|intval}] = new Array();
 		{foreach from=$country.states item='state' name='states'}
-			countries[{$country.id_country|intval}]['{$state.id_state|intval}'] = '{$state.name}';
+			countries[{$country.id_country|intval}]['{$smarty.foreach.states.iteration}'] = '{$state.name|escape:'htmlall':'UTF-8'}';
 		{/foreach}
 	{/if}
 {/foreach}
@@ -101,6 +102,7 @@ $(function(){ldelim}
 	<p class="submit2">
 		{if isset($id_address)}<input type="hidden" name="id_address" value="{$id_address|intval}" />{/if}
 		{if isset($back)}<input type="hidden" name="back" value="{$back}?step=1" />{/if}
+		{if isset($mod)}<input type="hidden" name="mod" value="{$mod}" />{/if}
 		{if isset($select_address)}<input type="hidden" name="select_address" value="{$select_address|intval}" />{/if}
 		<input type="submit" name="submitAddress" id="submitAddress" value="{l s='Save'}" class="button" />
 	</p>

@@ -103,12 +103,14 @@ $navigationPipe = (Configuration::get('PS_NAVIGATION_PIPE') ? Configuration::get
 $smarty->assign('navigationPipe', $navigationPipe);
 
 /* Server Params */
-$server_host = htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8');
+$server_host = Tools::getHttpHost(false, true);
 $protocol = 'http://';
 $protocol_ssl = 'https://';
 $protocol_link = (Configuration::get('PS_SSL_ENABLED')) ? $protocol_ssl : $protocol;
 $protocol_content = (isset($useSSL) AND $useSSL AND Configuration::get('PS_SSL_ENABLED')) ? $protocol_ssl : $protocol;
 define('_PS_BASE_URL_', $protocol.$server_host);
+
+Product::initPricesComputation();
 
 if (!Configuration::get('PS_THEME_V11'))
 {
@@ -133,7 +135,7 @@ if (!Configuration::get('PS_THEME_V11'))
 		'mail_dir' => _MAIL_DIR_,
 		'pic_dir' => $protocol_content.$server_host._THEME_PROD_PIC_DIR_,
 		'lang_iso' => $ps_language->iso_code,
-		'come_from' => 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').htmlentities($_SERVER['REQUEST_URI']),
+		'come_from' => Tools::getHttpHost(true, true).htmlentities($_SERVER['REQUEST_URI']),
 		'shop_name' => Configuration::get('PS_SHOP_NAME'),
 		'cart_qties' => intval($cart->nbProducts()),
 		'cart' => $cart,
@@ -145,7 +147,8 @@ if (!Configuration::get('PS_THEME_V11'))
 		'logged' => $cookie->isLogged(),
 		'page_name' => $page_name,
 		'customerName' => ($cookie->logged ? $cookie->customer_firstname.' '.$cookie->customer_lastname : false),
-		'priceDisplay' => intval(Configuration::get('PS_PRICE_DISPLAY'))
+		'priceDisplay' => intval($cookie->id_customer ? Group::getPriceDisplayMethod(intval($cookie->id_customer)) : Group::getDefaultPriceDisplayMethod()),
+		'roundMode' => intval(Configuration::get('PS_PRICE_ROUND_MODE'))
 	));
 }
 else
@@ -153,7 +156,7 @@ else
 	$protocol = (isset($useSSL) AND $useSSL AND Configuration::get('PS_SSL_ENABLED')) ? 'https://' : 'http://';
 	$smarty->assign(array(
 		'base_dir' => __PS_BASE_URI__,
-		'base_dir_ssl' => (Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__,
+		'base_dir_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__,
 		'content_dir' => __PS_BASE_URI__,
 		/* If the current page need SSL encryption and the shop allow it, then active it */
 		'protocol' => $protocol,
@@ -173,15 +176,26 @@ else
 		'mail_dir' => _MAIL_DIR_,
 		'pic_dir' => _THEME_PROD_PIC_DIR_,
 		'lang_iso' => $ps_language->iso_code,
-		'come_from' => 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').htmlentities($_SERVER['REQUEST_URI']),
+		'come_from' => Tools::getHttpHost(true, true).htmlentities($_SERVER['REQUEST_URI']),
 		'shop_name' => Configuration::get('PS_SHOP_NAME'),
 		'cart_qties' => intval($cart->nbProducts()),
 		'cart' => $cart,
 		'currencies' => Currency::getCurrencies(),
 		'id_currency_cookie' => intval($currency->id),
 		'currency' => $currency,
+		'cookie' => $cookie,
 		'languages' => Language::getLanguages(),
 		'logged' => $cookie->isLogged(),
+		'priceDisplay' => intval($cookie->id_customer ? Group::getPriceDisplayMethod(intval($cookie->id_customer)) : Group::getDefaultPriceDisplayMethod()),
 		'page_name' => $page_name,
-		'customerName' => ($cookie->logged ? $cookie->customer_firstname.' '.$cookie->customer_lastname : false)));
+		'customerName' => ($cookie->logged ? $cookie->customer_firstname.' '.$cookie->customer_lastname : false),
+		'roundMode' => intval(Configuration::get('PS_PRICE_ROUND_MODE'))));
+}
+
+/* Display a maintenance page if shop is closed */
+if (isset($maintenance) AND (!isset($_SERVER['REMOTE_ADDR']) OR !in_array($_SERVER['REMOTE_ADDR'], explode(',', Configuration::get('PS_MAINTENANCE_IP')))))
+{
+	header('HTTP/1.1 503 temporarily overloaded');
+	$smarty->display(_PS_THEME_DIR_.'maintenance.tpl');
+	exit;
 }

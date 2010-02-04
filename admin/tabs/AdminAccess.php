@@ -17,7 +17,7 @@ class AdminAccess extends AdminTab
 {
 	public function postProcess()
 	{
-		if (Tools::isSubmit('submitAddaccess') AND $action = Tools::getValue('action') AND $id_tab = intval(Tools::getValue('id_tab')) AND $id_profile = intval(Tools::getValue('id_profile')))
+		if (Tools::isSubmit('submitAddaccess') AND $action = Tools::getValue('action') AND $id_tab = intval(Tools::getValue('id_tab')) AND $id_profile = intval(Tools::getValue('id_profile')) AND $this->tabAccess['edit'] == 1)
 			Db::getInstance()->Execute('UPDATE `'._DB_PREFIX_.'access` SET `'.pSQL($action).'` = '.intval(Tools::getValue('perm')).' WHERE `id_tab` = '.intval($id_tab).' AND `id_profile` = '.intval($id_profile));
 	}
 	
@@ -53,7 +53,7 @@ class AdminAccess extends AdminTab
 		<table class="table" cellspacing="0">
 			<tr>
 				<th>
-					<select name="profile" onchange="redirect(\''.(Configuration::get('PS_SSL_ENABLED') ? 'https://' : 'http://').htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').$currentIndex.'&token='.$this->token.'&profile=\'+this.options[this.selectedIndex].value)">';
+					<select name="profile" onchange="redirect(\''.Tools::getHttpHost(true, true).$currentIndex.'&token='.$this->token.'&profile=\'+this.options[this.selectedIndex].value)">';
 		if ($profiles)
 			foreach ($profiles AS $profile)
 				echo '<option value="'.intval($profile['id_profile']).'" '.(intval($profile['id_profile']) == $currentProfile ? 'selected="selected"' : '').'>'.$profile['name'].'</option>';
@@ -86,7 +86,10 @@ class AdminAccess extends AdminTab
 		$perms = array('view', 'add', 'edit', 'delete');
 		echo '<tr><td'.($is_child ? '' : ' class="bold"').'>'.($is_child ? ' &raquo; ' : '').$tab['name'].'</td>';
 		foreach ($perms as $perm)
-			echo '<td class="center"><input type="checkbox" name="1" onchange="ajax_power(this, \''.$perm.'\', '.intval($access['id_tab']).', '.intval($access['id_profile']).', \''.$this->token.'\')" '.(intval($access[$perm]) == 1 ? 'checked="checked"' : '').'/></td>';
+			if($this->tabAccess['edit'] == 1)
+				echo '<td class="center"><input type="checkbox" name="1" onchange="ajax_power(this, \''.$perm.'\', '.intval($access['id_tab']).', '.intval($access['id_profile']).', \''.$this->token.'\')" '.(intval($access[$perm]) == 1 ? 'checked="checked"' : '').'/></td>';
+			else
+				echo '<td class="center"><input type="checkbox" name="1" disabled="disabled" '.(intval($access[$perm]) == 1 ? 'checked="checked"' : '').' /></td>';
 		echo '</tr>';
 	 
 	}

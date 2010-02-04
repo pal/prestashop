@@ -52,6 +52,13 @@ class Tax extends ObjectModel
 		return parent::getTranslationsFields(array('name'));
 	}
 
+	public function delete()
+	{
+		if (!Db::getInstance()->Execute('DELETE FROM `'._DB_PREFIX_.'tax_state` WHERE `id_tax` = '.intval($this->id)))
+			return false;
+		return parent::delete();
+	}
+
 	public static function checkTaxZone($id_tax, $id_zone)
 	{
 		return isset(self::$_TAX_ZONES[intval($id_zone)][intval($id_tax)]);
@@ -159,20 +166,20 @@ class Tax extends ObjectModel
 		return $tax ? floatval($tax['rate']) : false;
 	}
 
-	static public function getApplicableTax($id_tax, $productTax)
+	static public function getApplicableTax($id_tax, $productTax, $id_address_delivery = NULL)
 	{
 		global $cart, $cookie, $defaultCountry;
 
-		$id_address_invoice = intval((Validate::isLoadedObject($cart) AND $cart->id_address_invoice) ? $cart->id_address_invoice : (isset($cookie->id_address_invoice) ? $cookie->id_address_invoice : 0));
+		if (!$id_address_delivery)
+			$id_address_delivery = intval((Validate::isLoadedObject($cart) AND $cart->id_address_delivery) ? $cart->id_address_delivery : (isset($cookie->id_address_delivery) ? $cookie->id_address_delivery : 0));
 		/* If customer has an address (implies that he is registered and logged) */
-		if ($id_address_invoice AND $address_ids = Address::getCountryAndState($id_address_invoice))
+		if ($id_address_delivery AND $address_ids = Address::getCountryAndState($id_address_delivery))
 		{
 			$id_zone_country = Country::getIdZone(intval($address_ids['id_country']));
 			/* If customer's invoice address is inside a state */
 			if ($address_ids['id_state'])
 			{
 				$state = new State(intval($address_ids['id_state']));
-				
 				if (!Validate::isLoadedObject($state))
 					die(Tools::displayError());
 				/* Return tax value depending to the tax behavior */
@@ -187,7 +194,7 @@ class Tax extends ObjectModel
 				die(Tools::displayError('Unknown tax behavior!'));
 			}
 			/* Else getting country zone tax */
-			if (!$id_zone = Address::getZoneById($id_address_invoice))
+			if (!$id_zone = Address::getZoneById($id_address_delivery))
 				die(Tools::displayError());
 			return $productTax * Tax::zoneHasTax(intval($id_tax), intval($id_zone));
 		}

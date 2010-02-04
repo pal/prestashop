@@ -6,7 +6,6 @@ purple #d41958
 green #7eb423
 */
 
-
 body{
 	background-image : url(img/bg-body.png);
 	font-family:Verdana, Geneva, Arial, Helvetica, sans-serif;
@@ -22,7 +21,7 @@ a:hover{
 
 #container{
 	margin:1em auto 0 auto;
-	width:880px;
+	width:910px;
 	padding:30px 30px 0px 30px;
 	font-size:0.8em;
 	background : #456d01 url(img/bg-ctnr.png) top repeat-x;
@@ -44,6 +43,35 @@ div#loader{
 div#leftpannel{
 	float:left;
 	width:230px;
+}
+
+div#leftpannel div#help{
+	width:175px;
+	height:129px;
+	margin:20px auto;
+	padding:5px;
+	background:url('img/bg_help.png') no-repeat;
+	font-family:Arial, sans-serif;
+}
+div#leftpannel div#help img.ico_help{float:left; margin:5px;}
+div#leftpannel div#help div.content{
+	float:right;
+	width:125px;
+}
+div#leftpannel div#help div.content p.title{color:#fff;font-weight:bold;font-size:10.5pt;margin:4pt 0 3px 0;}
+div#leftpannel div#help div.content p.title_down{color:#383838;font-size:8pt;margin:0;}
+div#leftpannel div#help div.content ul{margin:10px 0;padding:0;}
+div#leftpannel div#help div.content ul li{clear:both;padding-bottom:5px;list-style-type:none;}
+div#leftpannel div#help div.content ul li img,
+ div#leftpannel div#help div.content ul li a{ float:left; }
+div#leftpannel div#help div.content ul li a{
+	display:block; 
+	margin-left:6px;
+	color:#fff;
+	font-weight:bold;
+	line-height:17px; 
+	vertical-align:middle;
+	text-decoration:underline;
 }
 
 ol#tabs{
@@ -225,7 +253,7 @@ div#sheets {
 	background-color:white;
 	margin-top:15px;
 	min-height:400px;
-	padding-bottom:2em;
+	
 }
 * html div#sheets {
 	height: 400px;
@@ -233,7 +261,7 @@ div#sheets {
 
 #sheets div.sheet{
 	display:none;
-	width:620px;
+	width:650px;
 	padding:1em;
 }
 
@@ -422,12 +450,22 @@ div#updateLog{
 	overflow:auto;
 	display:none;
 }
-p#resultInstall{
-	width:60%;
-	border:1px solid green;
-	margin:2em auto;
-	padding:1em;
+
+table#resultInstall{
+	width:100%;
+	margin:10px auto 5px auto;
+	border:none;
 }
+table#resultInstall td{
+	border-bottom:3px solid #FFF;
+	background:#F5FFE4;
+	padding:5px;
+}
+table#resultInstall td.label{
+	width:35%;
+	text-align:right;
+}
+table#resultInstall td.resultEnd{width:65%;color:#D41956;font-weight:bold;}
 p#alignedLogo{
 	text-align:center;
 }
@@ -501,6 +539,14 @@ div#installerVersion-fr {
 div#updaterVersion-fr {
 	background: url(img/langs/fr/updater-version.gif) left no-repeat;
 }
+
+div#installerVersion-es {
+	background: url(img/langs/es/installer-version.gif) left no-repeat;
+}
+
+div#updaterVersion-es {
+	background: url(img/langs/es/updater-version.gif) left no-repeat;
+}
 p#dbResultCheck{
 	height:auto;
 }
@@ -514,3 +560,26 @@ div#noJavaScript{
 	background-color: white;
 	text-align: center;
 }
+
+a#access, a#access_update{
+	display:block;
+	width:300px;
+	height:150px;
+	background:url('img/btn-installeur.png') top left;
+	font-family:Arial, sans-serif;
+}
+a#access:hover,a#access_update:hover{background:url('img/btn-installeur.png') bottom left;}
+a#access.BO{float:left;}
+a#access.FO{float:right;}
+a#access span{display:block;}
+a#access span.title{margin:5px 15px;font-size:18pt;font-weight:bold;color:#FFF;}
+a#access span.description{margin:10px 20px;color:#FFF;height:63px;}
+a#access span.message{margin-left:20px;font-weight:bold;color:#FFF;}
+a#access_update{float:left;}
+a#access_update span{display:block;}
+a#access_update span.title{margin:5px 15px;font-size:18pt;font-weight:bold;color:#FFF;}
+a#access_update span.description{margin:10px 20px;color:#FFF;height:63px;}
+a#access_update span.message{margin-left:20px;font-weight:bold;color:#FFF;}
+h3.no-margin{margin:0;}
+iframe#prestastore{width:100%;height:430px;border:none;margin:0px;}
+iframe#prestastore_update{clear:both;width:100%;height:430px;border:none;margin-top:15px;}

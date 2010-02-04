@@ -12,12 +12,12 @@
   *
   */
 
-define('_PS_DEBUG_', false);
-
 class MySQL extends Db
 {
 	public function	connect()
 	{
+		if (!defined('_PS_DEBUG_SQL_'))
+			define('_PS_DEBUG_SQL_', false);
 		if ($this->_link = @mysql_connect($this->_server, $this->_user, $this->_password))
 		{
 			if(!$this->set_db($this->_database))
@@ -51,10 +51,12 @@ class MySQL extends Db
 		if ($this->_link)
 			if ($this->_result = mysql_query($query.' LIMIT 1', $this->_link))
 			{
-				$this->displayMySQLError($query);
+				if (_PS_DEBUG_SQL_)
+					$this->displayMySQLError($query);
 				return mysql_fetch_assoc($this->_result);
 			}
-		$this->displayMySQLError($query);
+		if (_PS_DEBUG_SQL_)
+			$this->displayMySQLError($query);
 		return false;
 	}
 
@@ -72,10 +74,12 @@ class MySQL extends Db
 		if ($this->_link)
 		{
 			$this->_result = mysql_query($query, $this->_link);
-			$this->displayMySQLError($query);
+			if (_PS_DEBUG_SQL_)
+				$this->displayMySQLError($query);
 			return $this->_result;
 		}
-		$this->displayMySQLError($query);
+		if (_PS_DEBUG_SQL_)
+			$this->displayMySQLError($query);
 		return false;
 	}
 	
@@ -84,7 +88,8 @@ class MySQL extends Db
 		$this->_result = false;
 		if ($this->_link && $this->_result = mysql_query($query, $this->_link))
 		{
-			$this->displayMySQLError($query);
+			if (_PS_DEBUG_SQL_)
+				$this->displayMySQLError($query);
 			if (!$array)
 				return $this->_result;
 			$resultArray = array();
@@ -92,7 +97,8 @@ class MySQL extends Db
 				$resultArray[] = $row;
 			return $resultArray;
 		}
-		$this->displayMySQLError($query);
+		if (_PS_DEBUG_SQL_)
+			$this->displayMySQLError($query);
 		return false;
 	}
 
@@ -155,7 +161,7 @@ class MySQL extends Db
 
 	public function displayMySQLError($query = false)
 	{
-		if (_PS_DEBUG_ AND mysql_errno())
+		if (_PS_DEBUG_SQL_ AND mysql_errno())
 		{
 			if ($query)
 				die(Tools::displayError(mysql_error().'<br /><br /><pre>'.$query.'</pre>'));

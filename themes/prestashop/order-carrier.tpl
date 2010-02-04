@@ -32,7 +32,7 @@
 	<h3 class="condition_title">{l s='Terms of service'}</h3>
 	<p class="checkbox">
 		<input type="checkbox" name="cgv" id="cgv" value="1" {if $checkedTOS}checked="checked"{/if} />
-		<label for="cgv">{l s='I agree with the terms of service and I adhere to them unconditionally.'}</label> <a href="{$base_dir}cms.php?id_cms=3&amp;content_only=1&amp;TB_iframe=true&amp;width=450&amp;height=500&amp;thickbox=true" class="thickbox">{l s='(read)'}</a>
+		<label for="cgv">{l s='I agree with the terms of service and I adhere to them unconditionally.'}</label> <a href="{$base_dir_ssl}cms.php?id_cms=3&amp;content_only=1&amp;TB_iframe=true&amp;width=450&amp;height=500&amp;thickbox=true" class="thickbox">{l s='(read)'}</a>
 	</p>
 {/if}
 
@@ -62,7 +62,7 @@
 			{foreach from=$carriers item=carrier name=myLoop}
 				<tr class="{if $smarty.foreach.myLoop.first}first_item{elseif $smarty.foreach.myLoop.last}last_item{/if} {if $smarty.foreach.myLoop.index % 2}alternate_item{else}item{/if}">
 					<td class="carrier_action radio">
-						<input type="radio" name="id_carrier" value="{$carrier.id_carrier|intval}" id="id_carrier{$carrier.id_carrier|intval}" {if $carrier.id_carrier == $checked || ($checked == 0 && $i == 0) || ($carriers|@sizeof == 1)}checked="checked"{/if} />
+						<input type="radio" name="id_carrier" value="{$carrier.id_carrier|intval}" id="id_carrier{$carrier.id_carrier|intval}" {if $carrier.id_carrier == $checked || ($checked == 0 && $i == 0) || ($carriers|@sizeof == 1) || $default_carrier == $carrier.id_carrier}checked="checked"{/if} />
 					</td>
 					<td class="carrier_name">
 						<label for="id_carrier{$carrier.id_carrier|intval}">

@@ -68,6 +68,9 @@ class		Order extends ObjectModel
 	/** @var float Products total */
 	public 		$total_products;
 
+	/** @var float Products total tax excluded */
+	public 		$total_products_wt;
+
 	/** @var float Shipping total */
 	public 		$total_shipping;
 	
@@ -97,7 +100,7 @@ class		Order extends ObjectModel
 
 	protected $tables = array ('orders');
 
-	protected	$fieldsRequired = array('id_address_delivery', 'id_address_invoice', 'id_cart', 'id_currency', 'id_lang', 'id_customer', 'id_carrier', 'payment', 'total_paid', 'total_paid_real', 'total_products');
+	protected	$fieldsRequired = array('id_address_delivery', 'id_address_invoice', 'id_cart', 'id_currency', 'id_lang', 'id_customer', 'id_carrier', 'payment', 'total_paid', 'total_paid_real', 'total_products', 'total_products_wt');
 	protected	$fieldsSize = array('payment' => 32);
 	protected	$fieldsValidate = array(
 		'id_address_delivery' => 'isUnsignedId',
@@ -116,6 +119,7 @@ class		Order extends ObjectModel
 		'total_paid' => 'isPrice',
 		'total_paid_real' => 'isPrice',
 		'total_products' => 'isPrice',
+		'total_products_wt' => 'isPrice',
 		'total_shipping' => 'isPrice',
 		'total_wrapping' => 'isPrice',
 		'shipping_number' => 'isUrl'
@@ -124,6 +128,7 @@ class		Order extends ObjectModel
 	/* MySQL does not allow 'order' for a table name */
 	protected 	$table = 'orders';
 	protected 	$identifier = 'id_order';
+	private		$_taxCalculationMethod = PS_TAX_EXC;
 
 	public function getFields()
 	{
@@ -147,6 +152,7 @@ class		Order extends ObjectModel
 		$fields['total_paid'] = floatval($this->total_paid);
 		$fields['total_paid_real'] = floatval($this->total_paid_real);
 		$fields['total_products'] = floatval($this->total_products);
+		$fields['total_products_wt'] = floatval($this->total_products_wt);
 		$fields['total_shipping'] = floatval($this->total_shipping);
 		$fields['total_wrapping'] = floatval($this->total_wrapping);
 		$fields['invoice_number'] = intval($this->invoice_number);
@@ -158,6 +164,17 @@ class		Order extends ObjectModel
 		$fields['date_upd'] = pSQL($this->date_upd);
 
 		return $fields;
+	}
+
+	public function __construct($id = NULL, $id_lang = NULL)
+	{
+		parent::__construct($id, $id_lang);
+		$this->_taxCalculationMethod = $this->id_customer ? Group::getPriceDisplayMethod(intval($this->id_customer)) : Group::getDefaultPriceDisplayMethod();
+	}
+
+	public function getTaxCalculationMethod()
+	{
+		return intval($this->_taxCalculationMethod);
 	}
 
 	/* Does NOT delete a product but "cancel" it (which means return/refund/delete it depending of the case) */
@@ -184,15 +201,27 @@ class		Order extends ObjectModel
 	/* DOES delete the product */
 	private function _deleteProduct($orderDetail, $quantity)
 	{
-		$productPrice = round((floatval($orderDetail->product_price) * (1 + (floatval($orderDetail->tax_rate) * 0.01))) * intval($quantity), 2);
-		$productPriceWithoutTax = round(floatval($orderDetail->product_price) * intval($quantity), 2);
+		$unitPrice = number_format($orderDetail->product_price * (1 + $orderDetail->tax_rate * 0.01), 2, '.', '');	
+		$productPrice = number_format($quantity * $unitPrice, 2, '.', '');
+		$productPriceWithoutTax = number_format($productPrice / (1 + $orderDetail->tax_rate * 0.01), 2, '.', '');	
 
-		// Update order
+		/* Update order */
 		$this->total_paid -= $productPrice;
-		$this->total_paid_real -= $productPrice;
+		$this->total_paid_real -= $productPrice;		
 		$this->total_products -= $productPriceWithoutTax;
+		$this->total_products_wt -= $productPrice;
+		
+		/* Prevent from floating precision issues (total_products has only 2 decimals) */
+		if ($this->total_products < 0)
+			$this->total_products = 0;
+			
+		/* Prevent from floating precision issues */
+		$this->total_paid = number_format($this->total_paid, 2, '.', '');
+		$this->total_paid_real = number_format($this->total_paid_real, 2, '.', '');
+		$this->total_products = number_format($this->total_products, 2, '.', '');
+		$this->total_products_wt = number_format($this->total_products_wt, 2, '.', '');
 
-		// Update order detail
+		/* Update order detail */
 		$orderDetail->product_quantity -= intval($quantity);
 		
 		if (!$orderDetail->product_quantity)
@@ -298,11 +327,12 @@ class		Order extends ObjectModel
 				if (!$row['product_quantity'])
 					continue ;
 			}
-
-			$row['product_price_wt'] = number_format($row['product_price'] * (1 + ($row['tax_rate'] * 0.01)), 2, '.', '');
+			$price = $row['product_price'];
+			if ($this->_taxCalculationMethod == PS_TAX_EXC)
+				$price = Tools::ps_round($price, 2);
+			$row['product_price_wt'] = Tools::ps_round($price * (1 + ($row['tax_rate'] * 0.01)), 2);
 			$row['total_wt'] = $row['product_quantity'] * $row['product_price_wt'];
-			$row['total_price'] = number_format($row['total_wt'] / (1 + ($row['tax_rate'] * 0.01)), 2, '.', '');
-			$row['total_wt'] = number_format($row['total_wt'], 2, '.', '');
+			$row['total_price'] = $row['product_quantity'] * $row['product_price_wt'];
 
 			/* Add information for virtual product */
 			if ($row['download_hash'] AND !empty($row['download_hash']))
@@ -462,13 +492,11 @@ class		Order extends ObjectModel
 				SELECT os.`id_order_state`, osl.`name` AS order_state, os.`invoice`
 				FROM `'._DB_PREFIX_.'order_history` oh
 				LEFT JOIN `'._DB_PREFIX_.'order_state` os ON (os.`id_order_state` = oh.`id_order_state`)
-				LEFT JOIN `'._DB_PREFIX_.'order_state_lang` osl ON (os.`id_order_state` = osl.`id_order_state` AND osl.`id_lang` = '.intval($val['id_lang']).')
-				WHERE oh.`id_order_history` = (
-						SELECT MAX(`id_order_history`)
-						FROM `'._DB_PREFIX_.'order_history` moh
-						WHERE moh.`id_order` = '.intval($val['id_order']).'
-						GROUP BY moh.`id_order`)
+				INNER JOIN `'._DB_PREFIX_.'order_state_lang` osl ON (os.`id_order_state` = osl.`id_order_state` AND osl.`id_lang` = '.intval($val['id_lang']).')
+				WHERE oh.`id_order` = '.intval($val['id_order']).'
+				AND os.`hidden` != 1
 				ORDER BY oh.`date_add` DESC
+				LIMIT 1
 			');
 			if ($res2)
 				$res[$key] = array_merge($res[$key], $res2[0]);
@@ -478,12 +506,13 @@ class		Order extends ObjectModel
 
 	static public function getOrdersIdByDate($date_from, $date_to, $id_customer = NULL, $type = NULL)
 	{
-		$result = Db::getInstance()->ExecuteS('
+		$sql = '
 		SELECT `id_order`
 		FROM `'._DB_PREFIX_.'orders`
-		WHERE DATE_ADD(date_add, INTERVAL -1 DAY) <= \''.pSQL($date_to).'\' AND date_add >= \''.pSQL($date_from).'\''
+		WHERE DATE_ADD(date_upd, INTERVAL -1 DAY) <= \''.pSQL($date_to).'\' AND date_upd >= \''.pSQL($date_from).'\''
 		.($type ? ' AND '.pSQL(strval($type)).'_number != 0' : '')
-		.($id_customer ? ' AND id_customer = '.intval($id_customer) : ''));
+		.($id_customer ? ' AND id_customer = '.intval($id_customer) : '');
+		$result = Db::getInstance()->ExecuteS($sql);
 
 		$orders = array();
 		foreach ($result AS $order)
@@ -498,12 +527,24 @@ class		Order extends ObjectModel
 		FROM `'._DB_PREFIX_.'orders`
 		WHERE DATE_ADD(invoice_date, INTERVAL -1 DAY) <= \''.pSQL($date_to).'\' AND invoice_date >= \''.pSQL($date_from).'\''
 		.($type ? ' AND '.pSQL(strval($type)).'_number != 0' : '')
-		.($id_customer ? ' AND id_customer = '.intval($id_customer) : ''));
+		.($id_customer ? ' AND id_customer = '.intval($id_customer) : '').
+		' ORDER BY invoice_date ASC');
 
 		$orders = array();
 		foreach ($result AS $order)
 			$orders[] = intval($order['id_order']);
 		return $orders;
+	}
+
+
+    /**
+     * Get product total without taxes
+     *
+     * @return Product total with taxes
+     */
+    public function getTotalProductsWithoutTaxes($products = false)
+	{
+		return $this->total_products;
 	}
 
     /**
@@ -513,6 +554,9 @@ class		Order extends ObjectModel
      */
     public function getTotalProductsWithTaxes($products = false)
 	{
+		if ($this->total_products_wt != '0.00')
+			return $this->total_products_wt;
+
 		if (!$products)
 			$products = $this->getProductsDetail();
 
@@ -520,28 +564,11 @@ class		Order extends ObjectModel
 		foreach ($products AS $k => $row)
 		{
 			$qty = intval($row['product_quantity']);
-			$total += floatval($row['product_price']) * (floatval($row['tax_rate']) * 0.01 + 1) * $qty;
+			$total += floatval($row['product_price']) * $qty * (1 + $row['tax_rate'] / 100);
 		}
-		return round($total, 2);
-	}
-
-    /**
-     * Get product total without taxes
-     *
-     * @return Product total with taxes
-     */
-    public function getTotalProductsWithoutTaxes($products = false)
-	{
-		if (!$products)
-			$products = $this->getProductsDetail();
-
-        $total = 0;
-		foreach ($products AS $k => $row)
-		{
-			$qty = intval($row['product_quantity']);
-			$total += floatval($row['product_price']) * $qty;
-		}
-		return round($total, 2);
+		$this->total_products_wt = round($total, 2);
+		$this->update();
+		return $this->total_products_wt;
 	}
 
 	/**
@@ -703,19 +730,19 @@ class		Order extends ObjectModel
 	public function getTotalWeight()
 	{
 		$result = Db::getInstance()->getRow('
-		SELECT SUM(product_weight*product_quantity) as weight
+		SELECT SUM(product_weight * product_quantity) weight
 		FROM '._DB_PREFIX_.'order_detail
 		WHERE id_order = '.intval($this->id));
-		return $result['weight'];
+
+		return floatval($result['weight']);
 	}
 
 	static public function getInvoice($id_invoice)
 	{
-		$query = '
-			SELECT `invoice_number`, `id_order`
-			FROM `'._DB_PREFIX_.'orders`
-			WHERE invoice_number = '.intval($id_invoice);
-		return Db::getInstance()->getRow($query);
+		return Db::getInstance()->getRow('
+		SELECT `invoice_number`, `id_order`
+		FROM `'._DB_PREFIX_.'orders`
+		WHERE invoice_number = '.intval($id_invoice));
 	}
 }
 

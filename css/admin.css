@@ -591,6 +591,10 @@ p.infos {
 	width: 745px;
 }
 
+.width5 {
+	width: 655px;
+}
+
 .widthfull {
 	width: 100%;
 }
@@ -869,4 +873,26 @@ form#import_form {
 }
 .dragHandle{
 cursor: move;
+}
+
+p#mailResultCheck{
+	margin:2px 0;
+	padding-left:18px;
+	font-size:12px;
+}
+
+p.ok{
+	background:url('../img/admin/enabled.gif') no-repeat top left;
+	color:green;
+}
+
+p.fail{
+	background:url('../img/admin/disabled.gif') no-repeat top left;
+	font-weight:bold;
+	color:red;
+}
+#resultCheckLangPack{
+	border: 1px solid #DFD5C3;
+	padding:10px;
+	margin-bottom:10px;
 }

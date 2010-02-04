@@ -25,7 +25,7 @@ class AdminCustomers extends AdminTab
 	 	$this->delete = true;
 		$this->deleted = true;
 
-		$this->_select = '(YEAR(NOW()) - YEAR(birthday)) as age, (
+		$this->_select = '(YEAR(CURRENT_DATE)-YEAR(`birthday`)) - (RIGHT(CURRENT_DATE, 5)<RIGHT(`birthday`, 5)) as age, (
 			SELECT c.date_add FROM '._DB_PREFIX_.'guest g
 			LEFT JOIN '._DB_PREFIX_.'connections c ON c.id_guest = g.id_guest
 			WHERE g.id_customer = a.id_customer
@@ -48,7 +48,7 @@ class AdminCustomers extends AdminTab
 
 		$this->optionTitle = $this->l('Customers options');
 		$this->_fieldsOptions = array(
-			'PS_PASSWD_TIME_FRONT' => array('title' => $this->l('Password regenerate:'), 'desc' => $this->l('Security minimum time to wait for regenerate a new password'), 'cast' => 'intval', 'size' => 5, 'type' => 'text', 'suffix' => ' minutes'),
+			'PS_PASSWD_TIME_FRONT' => array('title' => $this->l('Password regenerate:'), 'desc' => $this->l('Security minimum time to wait for regenerate a new password'), 'cast' => 'intval', 'size' => 5, 'type' => 'text', 'suffix' => ' '.$this->l('minutes'))
 		);
 
 		parent::__construct();
@@ -98,6 +98,34 @@ class AdminCustomers extends AdminTab
 							$this->_errors[] = Tools::displayError('an error occurred while loading object').' <b>'.$this->table.'</b> '.Tools::displayError('(cannot load object)');
 					}
 				}
+				else
+				{
+					if ($this->tabAccess['add'] === '1')
+					{
+						$object = new $this->className();
+						$this->copyFromPost($object, $this->table);
+						if (!$object->add())
+							$this->_errors[] = Tools::displayError('an error occurred while creating object').' <b>'.$this->table.' ('.mysql_error().')</b>';
+						elseif (($_POST[$this->identifier] = $object->id /* voluntary */) AND $this->postImage($object->id) AND !sizeof($this->_errors) AND $this->_redirect)
+						{
+							// Add Associated groups
+							$group_list = Tools::getValue('groupBox');
+							if (is_array($group_list) && sizeof($group_list) > 0)
+								$object->addGroups($group_list);
+							$parent_id = intval(Tools::getValue('id_parent', 1));
+							// Save and stay on same form
+							if (Tools::isSubmit('submitAdd'.$this->table.'AndStay'))
+								Tools::redirectAdmin($currentIndex.'&'.$this->identifier.'='.$object->id.'&conf=3&update'.$this->table.'&token='.$this->token);
+							// Save and back to parent
+							if (Tools::isSubmit('submitAdd'.$this->table.'AndBackToParent'))
+								Tools::redirectAdmin($currentIndex.'&'.$this->identifier.'='.$parent_id.'&conf=3&token='.$this->token);
+							// Default behavior (save and back)
+							Tools::redirectAdmin($currentIndex.($parent_id ? '&'.$this->identifier.'='.$object->id : '').'&conf=3&token='.$this->token);
+						}
+					}
+					else
+						$this->_errors[] = Tools::displayError('You do not have permission to add anything here.');
+				}
 			}
 		}
 		return parent::postProcess();
@@ -127,7 +155,7 @@ class AdminCustomers extends AdminTab
 			<span style="font-weight: bold; font-size: 14px;">'.$customer->firstname.' '.$customer->lastname.'</span>
 			<img src="../img/admin/'.($customer->id_gender == 2 ? 'female' : ($customer->id_gender == 1 ? 'male' : 'unknown')).'.gif" style="margin-bottom: 5px" /><br />
 			<a href="mailto:'.$customer->email.'" style="text-decoration: underline; color: blue">'.$customer->email.'</a><br /><br />
-			'.$this->l('ID:').' '.sprintf('%06d', $customer->id).'<br />
+			'.$this->l('ID:').' '.sprintf('%06d', $customer->id).($customer->dni != NULL ? ' | '.$this->l('DNI:').' '.$customer->dni : '').'<br />
 			'.$this->l('Registration date:').' '.Tools::displayDate($customer->date_add, intval($cookie->id_lang), true).'<br />
 			'.$this->l('Last visit:').' '.($customerStats['last_visit'] ? Tools::displayDate($customerStats['last_visit'], intval($cookie->id_lang), true) : $this->l('never')).'
 		</fieldset>
@@ -381,7 +409,7 @@ class AdminCustomers extends AdminTab
 		$obj = $this->loadObject(true);
 		$defaultLanguage = intval(Configuration::get('PS_LANG_DEFAULT'));
 		$birthday = explode('-', $this->getFieldValue($obj, 'birthday'));
-		$customer_groups = $obj->getGroups();
+		$customer_groups = Tools::getValue('groupBox', $obj->getGroups());
 		echo '
 		<form action="'.$currentIndex.'&submitAdd'.$this->table.'=1&token='.$this->token.'" method="post" class="width3">
 		'.($obj->id ? '<input type="hidden" name="id_'.$this->table.'" value="'.$obj->id.'" />' : '').'

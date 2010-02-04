@@ -333,7 +333,7 @@ class AdminOrders extends AdminTab
 					'.($order->hasBeenPaid() ? '<td align="center">'.$customization['quantity_refunded'].'</td>' : '').'
 					'.($order->hasBeenDelivered() ? '<td align="center">'.$customization['quantity_returned'].'</td>' : '').'
 					<td align="center">-</td>
-					<td align="center">'.Tools::displayPrice($product['product_price'] * (1 + ($product['tax_rate'] * 0.01)) * ($customization['quantity']), $currency, false, false).'</td>
+					<td align="center">'.Tools::displayPrice(Tools::ps_round($product['product_price'], 2) * (1 + ($product['tax_rate'] * 0.01)) * ($customization['quantity']), $currency, false, false).'</td>
 					<td align="center" class="cancelCheck">
 						<input type="hidden" name="totalQtyReturn" id="totalQtyReturn" value="'.intval($customization['quantity_returned']).'" />
 						<input type="hidden" name="totalQty" id="totalQty" value="'.intval($customization['quantity']).'" />
@@ -425,7 +425,7 @@ class AdminOrders extends AdminTab
 			' - <a href="javascript:window.print()"><img src="../img/admin/printer.gif" alt="'.$this->l('Print order').'" title="'.$this->l('Print order').'" /></a>';
 		echo '</h2>';
 		
-		/* Display current state */
+		/* Display current status */
 		echo '
 			<table cellspacing="0" cellpadding="0" class="table" style="width: 429px">
 				<tr>
@@ -434,7 +434,7 @@ class AdminOrders extends AdminTab
 					<th>'.stripslashes($row['ostate_name']).'</th>
 					<th>'.((!empty($row['employee_lastname'])) ? '('.stripslashes(Tools::substr($row['employee_firstname'], 0, 1)).'. '.stripslashes($row['employee_lastname']).')' : '').'</th>
 				</tr>';
-			/* Display previous states */
+			/* Display previous status */
 			foreach ($history AS $row)
 			{
 				echo '
@@ -449,7 +449,7 @@ class AdminOrders extends AdminTab
 			</table>
 			<br />';
 
-		/* Display state form */
+		/* Display status form */
 		echo '
 			<form action="'.$currentIndex.'&view'.$this->table.'&token='.$this->token.'" method="post" style="text-align:center;">
 				<select name="id_order_state">';
@@ -461,7 +461,7 @@ class AdminOrders extends AdminTab
 				<input type="hidden" name="id_order" value="'.$order->id.'" />
 				<input type="submit" name="submitState" value="'.$this->l('Change').'" class="button" />
 			</form>';
-		
+
 		/* Display customer information */
 		echo '
 		<br />
@@ -473,7 +473,7 @@ class AdminOrders extends AdminTab
 			'.$this->l('Valid orders placed:').' <b>'.$customerStats['nb_orders'].'</b><br />
 			'.$this->l('Total paid since registration:').' <b>'.Tools::displayPrice($customerStats['total_orders'], $currency, false, false).'</b><br />
 		</fieldset>';
-		
+
 		/* Display sources */
 		if (sizeof($sources))
 		{
@@ -545,7 +545,7 @@ class AdminOrders extends AdminTab
 			<div style="margin: 2px 0 1em 50px;">
 				<table class="table" width="300px;" cellspacing="0" cellpadding="0">
 					<tr><td width="150px;">'.$this->l('Products').'</td><td align="right">'.Tools::displayPrice($order->getTotalProductsWithTaxes(), $currency, false, false).'</td></tr>
-					'.($order->total_discounts > 0 ? '<tr><td>'.$this->l('Discounts').'</td><td align="right">'.Tools::displayPrice($order->total_discounts, $currency, false, false).'</td></tr>' : '').'
+					'.($order->total_discounts > 0 ? '<tr><td>'.$this->l('Discounts').'</td><td align="right">-'.Tools::displayPrice($order->total_discounts, $currency, false, false).'</td></tr>' : '').'
 					'.($order->total_wrapping > 0 ? '<tr><td>'.$this->l('Wrapping').'</td><td align="right">'.Tools::displayPrice($order->total_wrapping, $currency, false, false).'</td></tr>' : '').'
 					<tr><td>'.$this->l('Shipping').'</td><td align="right">'.Tools::displayPrice($order->total_shipping, $currency, false, false).'</td></tr>
 					<tr style="font-size: 20px"><td>'.$this->l('Total').'</td><td align="right">'.Tools::displayPrice($order->total_paid, $currency, false, false).($order->total_paid != $order->total_paid_real ? '<br /><font color="red">('.$this->l('Paid:').' '.Tools::displayPrice($order->total_paid_real, $currency, false, false).')</font>' : '').'</td></tr>
@@ -613,7 +613,7 @@ class AdminOrders extends AdminTab
 							'.($order->hasBeenPaid() ? '<th style="width: 20px; text-align: center">'.$this->l('Refunded').'</th>' : '').'
 							'.($order->hasBeenDelivered() ? '<th style="width: 20px; text-align: center">'.$this->l('Returned').'</th>' : '').'
 							<th style="width: 30px; text-align: center">'.$this->l('Stock').'</th>
-							<th style="width: 90px; text-align: center">'.$this->l('Total').'</th>
+							<th style="width: 90px; text-align: center">'.$this->l('Total').' <sup>*</sup></th>
 							<th colspan="2" style="width: 120px;"><img src="../img/admin/delete.gif" alt="'.$this->l('Products').'" /> '.($order->hasBeenDelivered() ? $this->l('Return') : ($order->hasBeenPaid() ? $this->l('Refund') : $this->l('Cancel'))).'</th>';
 		echo '
 						</tr>';
@@ -658,19 +658,19 @@ class AdminOrders extends AdminTab
 										'.($product['product_reference'] ? $this->l('Ref:').' '.$product['product_reference'] : '')
 										.(($product['product_reference'] AND $product['product_supplier_reference']) ? ' / '.$product['product_supplier_reference'] : '')
 										.'</a></td>
-									<td align="center">'.Tools::displayPrice($product['product_price_wt'], $currency, false, false).'</td>
+									<td align="center">'.Tools::displayPrice($order->getTaxCalculationMethod() == PS_TAX_EXC ? $product['product_price'] : $product['product_price_wt'], $currency, false, false).'</td>
 									<td align="center" class="productQuantity">'.(intval($product['product_quantity']) - $product['customizationQuantityTotal']).'</td>
 									'.($order->hasBeenPaid() ? '<td align="center" class="productQuantity">'.intval($product['product_quantity_refunded']).'</td>' : '').'
 									'.($order->hasBeenDelivered() ? '<td align="center" class="productQuantity">'.intval($product['product_quantity_return']).'</td>' : '').'
 									<td align="center" class="productQuantity">'.intval($stock['quantity']).'</td>
-									<td align="center">'.Tools::displayPrice($product['product_price'] * (1 + ($product['tax_rate'] * 0.01)) * (intval($product['product_quantity']) - $product['customizationQuantityTotal']), $currency, false, false).'</td>
+									<td align="center">'.Tools::displayPrice(($order->getTaxCalculationMethod() == PS_TAX_EXC ? $product['product_price'] : Tools::ps_round($product['product_price'] * (1 + ($product['tax_rate'] * 0.01)), 2)) * (intval($product['product_quantity']) - $product['customizationQuantityTotal']), $currency, false, false).'</td>
 									<td align="center" class="cancelCheck">
 										<input type="hidden" name="totalQtyReturn" id="totalQtyReturn" value="'.intval($product['product_quantity_return']).'" />
 										<input type="hidden" name="totalQty" id="totalQty" value="'.intval($product['product_quantity']).'" />
 										<input type="hidden" name="productName" id="productName" value="'.$product['product_name'].'" />';
 								if ((!$order->hasBeenDelivered() OR Configuration::get('PS_ORDER_RETURN')) AND intval($product['product_quantity_return']) < intval($product['product_quantity']))
 									echo '
-										<input type="checkbox" name="id_order_detail['.$k.']" id="id_order_detail['.$k.']" value="'.$product['id_order_detail'].'" onchange="setCancelQuantity(this, '.intval($product['id_order_detail']).', 1)" '.((intval($product['product_quantity_return'] + $product['product_quantity_refunded']) >= intval($product['product_quantity'])) ? 'disabled="disabled" ' : '').'/>';
+										<input type="checkbox" name="id_order_detail['.$k.']" id="id_order_detail['.$k.']" value="'.$product['id_order_detail'].'" onchange="setCancelQuantity(this, '.intval($product['id_order_detail']).', '.intval($product['product_quantity'] - $product['customizationQuantityTotal']).')" '.((intval($product['product_quantity_return'] + $product['product_quantity_refunded']) >= intval($product['product_quantity'])) ? 'disabled="disabled" ' : '').'/>';
 								else
 									echo '--';
 								echo '
@@ -688,7 +688,7 @@ class AdminOrders extends AdminTab
 						}
 					echo '
 					</table>
-					<div style="float:left; width:280px; margin-top:15px;"><sup>*</sup> '.$this->l('Prices are printed without taxes').(!Configuration::get('PS_ORDER_RETURN') ? '<br /><br />'.$this->l('Merchandise returns are disabled') : '').'</div>';
+					<div style="float:left; width:280px; margin-top:15px;"><sup>*</sup> '.$this->l('According to the group of this customer, prices are printed:').' '.($order->getTaxCalculationMethod() == PS_TAX_EXC ? $this->l('tax excluded.') : $this->l('tax included.')).(!Configuration::get('PS_ORDER_RETURN') ? '<br /><br />'.$this->l('Merchandise returns are disabled') : '').'</div>';
 					if (sizeof($discounts))
 					{
 						echo '
@@ -835,8 +835,12 @@ class AdminOrders extends AdminTab
 	private function getTotal()
 	{
 		$total = 0;
+		$currencyData = Currency::getCurrencies();
+		$currencies = array();
+		foreach ($currencyData as $currency)
+			$currencies[intval($currency['id_currency'])] = $currency;
 		foreach ($this->_list as $item)
-			$total += $item['total_paid'];
+			$total += Tools::convertPrice($item['total_paid'], $currencies[intval($item['id_currency'])]);
 		return $total;
 	}
 }

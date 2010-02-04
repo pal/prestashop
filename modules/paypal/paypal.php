@@ -20,6 +20,8 @@ class Paypal extends PaymentModule
         $this->displayName = $this->l('PayPal');
         $this->description = $this->l('Accepts payments by PayPal');
 		$this->confirmUninstall = $this->l('Are you sure you want to delete your details ?');
+		if (Configuration::get('PAYPAL_BUSINESS') == 'paypal@prestashop.com')
+			$this->warning = $this->l('You are currently using the default PayPal email address, you need to use your own email address');
 	}
 
 	public function getPaypalUrl()
@@ -178,7 +180,7 @@ class Paypal extends PaymentModule
 			if (isset($product['attributes']))
 				$products[$key]['attributes'] = str_replace('"', '\'', $product['attributes']);
 			$products[$key]['name'] = htmlentities(utf8_decode($product['name']));
-			$products[$key]['paypalAmount'] = number_format(Tools::convertPrice($product['price_wt'], $currency), 2, '.', '');
+			$products[$key]['paypalAmount'] = Tools::convertPrice($product['price_wt'], $currency);
 		}
 		$smarty->assign(array(
 			'address' => $address,
@@ -189,17 +191,13 @@ class Paypal extends PaymentModule
 			'currency' => $currency,
 			'paypalUrl' => $this->getPaypalUrl(),
 			// products + discounts - shipping cost
-			'amount' => number_format(Tools::convertPrice($params['cart']->getOrderTotal(true, 4), $currency), 2, '.', ''),
-			// shipping cost + wrapping
-			'shipping' =>  number_format(Tools::convertPrice(($params['cart']->getOrderShippingCost() + $params['cart']->getOrderTotal(true, 6)), $currency), 2, '.', ''),
-			'discounts' => $params['cart']->getDiscounts(),
-			'products' => $products,
+			'amount' => Tools::convertPrice($params['cart']->getOrderTotal(true, 4), $currency),
 			// products + discounts + shipping cost
-			'total' => number_format(Tools::convertPrice($params['cart']->getOrderTotal(true, 3), $currency), 2, '.', ''),
+			'total' => Tools::convertPrice($params['cart']->getOrderTotal(true, 3), $currency),
 			'id_cart' => intval($params['cart']->id),
-			'goBackUrl' => 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'order-confirmation.php?key='.$customer->secure_key.'&id_cart='.intval($params['cart']->id).'&id_module='.intval($this->id),
-			'notify' => 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'modules/paypal/validation.php',
-			'cancelUrl' => 'http://'.htmlspecialchars($_SERVER['HTTP_HOST'], ENT_COMPAT, 'UTF-8').__PS_BASE_URI__.'index.php',
+			'goBackUrl' => Tools::getHttpHost(true, true).__PS_BASE_URI__.'order-confirmation.php?key='.$customer->secure_key.'&id_cart='.intval($params['cart']->id).'&id_module='.intval($this->id),
+			'notify' => 'http://'.Tools::getHttpHost(false, true).__PS_BASE_URI__.'modules/paypal/validation.php',
+			'cancelUrl' => 'http://'.Tools::getHttpHost(false, true).__PS_BASE_URI__.'index.php',
 			'this_path' => $this->_path
 		));
 

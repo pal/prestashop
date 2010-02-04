@@ -27,8 +27,10 @@ class BlockWishList extends Module
 			return (false);
 		$sql = str_replace('PREFIX_', _DB_PREFIX_, $sql);
 		$sql = preg_split("/;\s*[\r\n]+/", $sql);
-		foreach ($sql AS $k=>$query)
-			Db::getInstance()->Execute(trim($query));
+		foreach ($sql AS $query)
+			if($query)
+				if(!Db::getInstance()->Execute(trim($query)))
+					return false;
 		if (!parent::install() OR
 						!$this->registerHook('rightColumn') OR
 						!$this->registerHook('productActions') OR
@@ -160,7 +162,12 @@ class BlockWishList extends Module
 		$this->_html .= 	'</fieldset>
 		</form>';
 	}
-		
+	
+	public function hookHeader($params)
+	{
+		return '<script type="text/javascript" src="'._MODULE_DIR_.'blockwishlist/js/ajax-wishlist.js"></script>';
+	}
+	
 	public function hookRightColumn($params)
 	{
 		global $smarty;
