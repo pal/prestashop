@@ -176,12 +176,12 @@ function processAddress()
 		$errors[] = 'this address is not in a valid area';
 	else
 	{
-		$cart->id_address_delivery = intval($_POST['id_address_delivery']);
-		$cart->id_address_invoice = isset($_POST['same']) ? intval($_POST['id_address_delivery']) : intval($_POST['id_address_invoice']);
+		$cart->id_address_delivery = intval(Tools::getValue('id_address_delivery'));
+		$cart->id_address_invoice = Tools::isSubmit('same') ? $cart->id_address_delivery : intval(Tools::getValue('id_address_invoice'));
 		if (!$cart->update())
 			$errors[] = Tools::displayError('an error occured while updating your cart');
 
-		if (isset($_POST['message']) AND !empty($_POST['message']))
+		if (Tools::isSubmit('message') AND !empty($_POST['message']))
 		{
 			if (!Validate::isMessage($_POST['message']))
 				$errors[] = Tools::displayError('invalid message');
@@ -324,7 +324,8 @@ function displayCarrier()
 	else
 		die(Tools::displayError($this->l('Hack attempt: No customer')));
 	$result = Carrier::getCarriers(intval($cookie->id_lang), true, false, intval($id_zone), $customer->getGroups());
-	$result = Carrier::getCarriers(intval($cookie->id_lang), true, false, intval($id_zone));
+	if (!$result)
+		$result = Carrier::getCarriers(intval($cookie->id_lang), true, false, intval($id_zone));
 	$resultsArray = array();
 	foreach ($result AS $k => $row)
 	{
@@ -365,7 +366,7 @@ function displayCarrier()
 	// Wrapping fees
 	$wrapping_fees = floatval(Configuration::get('PS_GIFT_WRAPPING_PRICE'));
 	$wrapping_fees_tax = new Tax(intval(Configuration::get('PS_GIFT_WRAPPING_TAX')));
-	$wrapping_fees_tax_exc = $wrapping_fees / (1 + ((floatval($wrapping_fees_tax->rate) / 100)));
+	$wrapping_fees_tax_inc = $wrapping_fees * (1 + ((floatval($wrapping_fees_tax->rate) / 100)));
 
 	if (Validate::isUnsignedInt($cart->id_carrier) AND $cart->id_carrier)
 	{
@@ -386,8 +387,8 @@ function displayCarrier()
 		'default_carrier' => intval(Configuration::get('PS_CARRIER_DEFAULT')),
 		'HOOK_EXTRACARRIER' => Module::hookExec('extraCarrier', array('address' => $address)),
 		'checked' => intval($checked),
-		'total_wrapping' => $wrapping_fees,
-		'total_wrapping_tax_exc' => $wrapping_fees_tax_exc));
+		'total_wrapping' => $wrapping_fees_tax_inc,
+		'total_wrapping_tax_exc' => $wrapping_fees));
 	Tools::safePostVars();
 	$css_files = array(__PS_BASE_URI__.'css/thickbox.css' => 'all');
 	$js_files = array(__PS_BASE_URI__.'js/jquery/thickbox-modified.js');
@@ -437,10 +438,14 @@ function displaySummary()
 			}
 		$smarty->assign('free_ship', $total_free_ship);
 	}
+	// for compatibility with 1.2 themes
+	foreach($summary['products'] AS $key => $product)
+		$summary['products'][$key]['quantity'] = $product['cart_quantity'];
 	$smarty->assign($summary);
 	$token = Tools::getToken(false);
 	$smarty->assign(array(
 		'token_cart' => $token,
+		'isVirtualCart' => $cart->isVirtualCart(),
 		'productNumber' => $cart->nbProducts(),
 		'voucherAllowed' => Configuration::get('PS_VOUCHERS'),
 		'HOOK_SHOPPING_CART' => Module::hookExec('shoppingCart', $summary),

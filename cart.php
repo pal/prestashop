@@ -71,17 +71,15 @@ if ($add OR Tools::getIsset('update') OR $delete)
 					/* Product addition to the cart */
 					if (!isset($cart->id) OR !$cart->id)
 					{
-						$cart->id_address_delivery = intval($cookie->id_address_delivery);
-						$cart->id_address_invoice = intval($cookie->id_address_invoice);
 					    $cart->add();
 					    if ($cart->id)
 							$cookie->id_cart = intval($cart->id);
 					}
-					if ($add AND !$cart->containsProduct(intval($idProduct), intval($idProductAttribute), $customizationId) AND !$producToAdd->hasAllRequiredCustomizableFields())
+					if ($add AND !$producToAdd->hasAllRequiredCustomizableFields() AND !$customizationId)
 						$errors[] = Tools::displayError('Please fill all required fields, then save the customization.');
 					if (!sizeof($errors) AND !$cart->updateQty(intval($qty), intval($idProduct), intval($idProductAttribute), $customizationId, Tools::getValue('op', 'up')))
 						$errors[] = Tools::displayError('you already have the maximum quantity available for this product')
-							.((isset($_SERVER['HTTP_REFERER']) AND basename($_SERVER['HTTP_REFERER']) == 'order.php') ? ('<script language="javascript">setTimeout("history.back()",5000);</script><br />- '.
+							.((isset($_SERVER['HTTP_REFERER']) AND basename($_SERVER['HTTP_REFERER']) == 'order.php' OR (!Tools::isSubmit('ajax') AND substr(basename($_SERVER['REQUEST_URI']),0, strlen('cart.php')) == 'cart.php')) ? ('<script language="javascript">setTimeout("history.back()",5000);</script><br />- '.
 							Tools::displayError('You will be redirected to your cart in a few seconds.')) : '');
 				}
 				elseif ($delete)

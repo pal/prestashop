@@ -114,7 +114,7 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 				{foreach from=$images item=image name=thumbnails}
 				{assign var=imageIds value=`$product->id`-`$image.id_image`}
 				<li id="thumbnail_{$image.id_image}">
-					<a href="{$link->getImageLink($product->link_rewrite, $imageIds, 'thickbox')}" rel="other-views" class="{if !$jqZoomEnabled}thickbox{/if} {if $smarty.foreach.thumbnails.first}shown{/if}" title="{$image.legend|htmlspecialchars}">
+					<a href="{$link->getImageLink($product->link_rewrite, $imageIds, 'thickbox')}" rel="other-views" class="thickbox {if $smarty.foreach.thumbnails.first}shown{/if}" title="{$image.legend|htmlspecialchars}">
 						<img id="thumb_{$image.id_image}" src="{$link->getImageLink($product->link_rewrite, $imageIds, 'medium')}" alt="{$image.legend|htmlspecialchars}" height="{$mediumSize.height}" width="{$mediumSize.width}" />
 					</a>
 				</li>
@@ -195,11 +195,11 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 				<span class="our_price_display">
 				{if !$priceDisplay || $priceDisplay == 2}
 					<span id="our_price_display">{convertPrice price=$product->getPrice(true, $smarty.const.NULL)}</span>
-						{l s='tax incl.'}
+						{if $tax_enabled}{l s='tax incl.'}{/if}
 				{/if}
 				{if $priceDisplay == 1}
 					<span id="our_price_display">{convertPrice price=$product->getPrice(false, $smarty.const.NULL)}</span>
-						{l s='tax excl.'}
+						{if $tax_enabled}{l s='tax excl.'}{/if}
 				{/if}
 				</span>
 				{if $priceDisplay == 2}
@@ -212,11 +212,11 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 				<p id="old_price"><span class="bold">
 				{if !$priceDisplay || $priceDisplay == 2}
 					<span id="old_price_display">{convertPrice price=$product->getPriceWithoutReduct()}</span>
-						{l s='tax incl.'}
+						{if $tax_enabled}{l s='tax incl.'}{/if}
 				{/if}
 				{if $priceDisplay == 1}
 					<span id="old_price_display">{convertPrice price=$product->getPriceWithoutReduct(true)}</span>
-						{l s='tax excl.'}
+						{if $tax_enabled}{l s='tax excl.'}{/if}
 				{/if}
 				</span>
 				</p>
@@ -240,9 +240,9 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 			<p>
 				<label for="group_{$id_attribute_group|intval}">{$group.name|escape:'htmlall':'UTF-8'} :</label>
 				{assign var='groupName' value='group_'|cat:$id_attribute_group}
-				<select name="{$groupName}" id="group_{$id_attribute_group|intval}" onchange="javascript:findCombination();{if $group.is_color_group}$('#resetImages').show('slow');{/if}">
+				<select name="{$groupName}" id="group_{$id_attribute_group|intval}" onchange="javascript:findCombination();{if $colors|@count > 0}$('#resetImages').show('slow');{/if}">
 					{foreach from=$group.attributes key=id_attribute item=group_attribute}
-						<option value="{$id_attribute|intval}"{if (isset($smarty.get.$groupName) && $smarty.get.$groupName|intval == $id_attribute) || $group.default == $id_attribute} selected="selected"{/if}>{$group_attribute|escape:'htmlall':'UTF-8'}</option>
+						<option value="{$id_attribute|intval}"{if (isset($smarty.get.$groupName) && $smarty.get.$groupName|intval == $id_attribute) || $group.default == $id_attribute} selected="selected"{/if} title="{$group_attribute|escape:'htmlall':'UTF-8'}">{$group_attribute|escape:'htmlall':'UTF-8'}</option>
 					{/foreach}
 				</select>
 			</p>
@@ -259,7 +259,7 @@ var fieldRequired = '{l s='Please fill all required fields' js=1}';
 			</p>
 
 			<!-- availability -->
-			<p id="availability_statut"{if $allow_oosp && (($product->quantity == 0 && !$product->available_later) || (!$product->available_now && $display_qties != 1))} style="display:none;"{/if}>
+			<p id="availability_statut"{if ($product->quantity == 0 && !$product->available_later) OR ($product->quantity != 0 && !$product->available_now)} style="display:none;"{/if}>
 				<span id="availability_label">{l s='Availability:'}</span>
 				<span id="availability_value"{if $product->quantity == 0} class="warning-inline"{/if}>
 					{if $product->quantity == 0}{if $allow_oosp}{$product->available_later}{else}{l s='This product is no longer in stock'}{/if}{else}{$product->available_now}{/if}

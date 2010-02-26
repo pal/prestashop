@@ -67,7 +67,7 @@ class AdminImport extends AdminTab
 				$this->available_fields = array(
 					'no' => $this->l('Ignore this column'),
 					'id_product' => $this->l('Product ID'),
-					'options' => $this->l('Options'),
+					'options' => $this->l('Options (Group:Value)'),
 					'reference' => $this->l('Reference'),
 					'supplier_reference' => $this->l('Supplier reference'),
 					'ean13' => $this->l('EAN13'),
@@ -222,7 +222,7 @@ class AdminImport extends AdminTab
 				
 				self::$default_values = array(
 				'alias' => 'Alias',	
-				'postcode' => 'X',			trunk/img/tmp/product_mini_9.jpg
+				'postcode' => 'X'
 				);				
 								
 			break;			
@@ -359,30 +359,11 @@ class AdminImport extends AdminTab
 	
 	static public function array_walk(&$array, $funcname, &$user_data = false)
 	{
-		$func_is_method = false;
-		if (!isset($funcname[1]))
-		{
-			if (!function_exists($funcname[0]))
-			return false;
-		}
-		else
-		{
-			if (!class_exists($funcname[0], true) OR !method_exists($funcname[0], $funcname[1]))
-				return false;
-			else
-				$func_is_method = true;
-		}
+		if (!is_callable($funcname)) return false;
+		
 		foreach ($array AS $k => $row)
-		{
-			if ($func_is_method)
-			{
-				if (!call_user_func_array(array($funcname[0], $funcname[1]), array($row, $k, $user_data)))
-					return false;
-			}
-			else
-				if (!call_user_func_array($funcname[0], array($row, $key, $user_data)))
-					return false;
-		}
+			if (!call_user_func_array($funcname, array($row, $k, $user_data)))
+				return false;
 		return true;
 	}
 
@@ -696,10 +677,28 @@ class AdminImport extends AdminTab
 			{
 				if (isset($product->tags) AND !empty($product->tags))
 				{
+					// Delete tags for this id product, for no duplicating error
+					Tag::deleteTagsForProduct($product->id);
+					
 					$tag = new Tag();
-					$array = self::createMultiLangField($product->tags);
-					foreach ($array AS $key => $tags)
-						$a = $tag->addTags($key, $product->id, $tags);
+					if (!is_array($product->tags))
+					{
+						$product->tags = self::createMultiLangField($product->tags);
+						foreach($product->tags AS $key => $tags)
+							$a = $tag->addTags($key, $product->id, $tags);
+					}
+					else
+					{
+						foreach ($product->tags AS $key => $tags)
+						{
+							$str = '';
+							foreach($tags AS $one_tag)
+								$str .= $one_tag.',';
+							$str = rtrim($str, ',');
+							
+							$a = $tag->addTags($key, $product->id, $str);
+						}
+					}
 				}
 
 				if (isset($product->image) AND is_array($product->image) and sizeof($product->image))
@@ -714,7 +713,10 @@ class AdminImport extends AdminTab
 							$image->cover = (!$key AND !$productHasImages) ? true : false;
 							$image->legend = self::createMultiLangField($product->name[$defaultLanguageId]);
 							if (($fieldError = $image->validateFields(UNFRIENDLY_ERROR, true)) === true AND ($langFieldError = $image->validateFieldsLang(UNFRIENDLY_ERROR, true)) === true AND $image->add())
-								self::copyImg($product->id, $image->id, $url);
+							{
+								if (!self::copyImg($product->id, $image->id, $url))
+									$this->_warnings[] = Tools::displayError('Error copying image: ').$url; 
+							}
 							else
 							{
 								$this->_warnings[] = $image->legend[$defaultLanguageId].(isset($image->id_product) ? ' ('.$image->id_product.')' : '').' '.Tools::displayError('cannot be saved');
@@ -743,11 +745,11 @@ class AdminImport extends AdminTab
 	{
 		$defaultLanguage = Configuration::get('PS_LANG_DEFAULT');
 		$groups = array();
-		foreach (AttributeGroup::getAttributesGroups($defaultLanguage) as $group)
-			$groups[$group['name']] = $group['id_attribute_group'];
+		foreach (AttributeGroup::getAttributesGroups($defaultLanguage) AS $group)
+			$groups[$group['name']] = intval($group['id_attribute_group']);
 		$attributes = array();
-		foreach (Attribute::getAttributes($defaultLanguage) as $attribute)
-			$attributes[$attribute['name'].'_'.$attribute['id_attribute']] = $attribute['id_attribute'];
+		foreach (Attribute::getAttributes($defaultLanguage) AS $attribute)
+			$attributes[$attribute['attribute_group'].'_'.$attribute['name']] = intval($attribute['id_attribute']);
 		
 		$this->receiveTab();
 		$handle = $this->openCsvFile();
@@ -1164,6 +1166,12 @@ class AdminImport extends AdminTab
 	private function openCsvFile()
 	{
 		$handle = fopen(dirname(__FILE__).'/../import/'.Tools::getValue('csv'), 'r');
+		
+		/* No BOM allowed */
+		$bom = fread($handle, 3);
+		if ($bom != '\xEF\xBB\xBF')
+			rewind($handle);
+
 		if (!$handle)
 			die(Tools::displayError('Cannot read the csv file'));
 			
@@ -1396,6 +1404,7 @@ class AdminImport extends AdminTab
 					$this->_errors[] = $this->l('no entity selected');
 			}
 		}
+		
 		parent::postProcess();
 	}
 }

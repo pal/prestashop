@@ -10,11 +10,14 @@ if (!isset($_SERVER['REQUEST_URI']) || $_SERVER['REQUEST_URI'] == '')
 if ($tmp = strpos($_SERVER['REQUEST_URI'], '?'))
 	$_SERVER['REQUEST_URI'] = substr($_SERVER['REQUEST_URI'], 0, $tmp);
 
-define('INSTALL_VERSION', '1.3.0.1');
+define('INSTALL_VERSION', '1.3.0.2');
 define('MINIMUM_VERSION_TO_UPDATE', '0.8.5');
 define('INSTALL_PATH', dirname(__FILE__));
 include_once(INSTALL_PATH.'/classes/ToolsInstall.php');
-$tmpBaseUri = substr($_SERVER['REQUEST_URI'], 0, -1 * (strlen($_SERVER['REQUEST_URI']) - strrpos($_SERVER['REQUEST_URI'], '/')) - strlen(substr(substr($_SERVER['REQUEST_URI'],0,-1), strrpos( substr($_SERVER['REQUEST_URI'],0,-1),"/" )+1)));
+
+/* Prevent from bad URI parsing when using index.php */
+$requestUri = str_replace('index.php', '', $_SERVER['REQUEST_URI']);
+$tmpBaseUri = substr($requestUri, 0, -1 * (strlen($requestUri) - strrpos($requestUri, '/')) - strlen(substr(substr($requestUri,0,-1), strrpos( substr($requestUri,0,-1),"/" )+1)));
 define('PS_BASE_URI', $tmpBaseUri[strlen($tmpBaseUri) - 1] == '/' ? $tmpBaseUri : $tmpBaseUri.'/');
 define('PS_BASE_URI_ABSOLUTE', 'http://'.ToolsInstall::getHttpHost(false, true).PS_BASE_URI);
 
@@ -39,6 +42,7 @@ function lang($txt) {
 }
 if ($lm->getIncludeTradFilename())
 	include_once($lm->getIncludeTradFilename());
+
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" >
@@ -93,7 +97,7 @@ if ($lm->getIncludeTradFilename())
 		var txtTabInstaller4 = "<?php echo lang('Shop configuration'); ?>";
 		var txtTabInstaller5 = "<?php echo lang('Installation is complete!'); ?>";
 		var txtConfigIsOk = "<?php echo lang('Your configuration is valid, click next to continue!'); ?>";
-		var txtConfigIsNotOk = "<?php echo lang('Your configuration is invalid,<br />thank you to fix these small issues:'); ?>";
+		var txtConfigIsNotOk = "<?php echo lang('Your configuration is invalid. Please fix the issues below:'); ?>";
 		
 		var txtError = new Array();
 		txtError[0] = "<?php echo lang('Required field'); ?>";
@@ -745,7 +749,7 @@ if ($lm->getIncludeTradFilename())
 			</div>
 			<?php
 			// Check if can contact prestastore.com
-			if (@fsockopen('www.prestastore.com', 80)):
+			if (@fsockopen('www.prestastore.com', 80, $errno, $errst, 3)):
 			?>
 			<iframe src="http://www.prestastore.com/psinstall.php?lang=<?php echo $lm->getIsoCodeSelectedLang()?>" scrolling="no" id="prestastore">
 				<p>Your browser does not support iframes.</p>
@@ -833,7 +837,7 @@ if ($lm->getIncludeTradFilename())
 			</div>
 			<?php
 			// Check if can contact prestastore.com
-			if (@fsockopen('www.prestastore.com', 80)):
+			if (@fsockopen('www.prestastore.com', 80, $errno, $errst, 3)):
 			?>
 			<iframe src="http://www.prestastore.com/psinstall.php?lang=<?php echo $lm->getIsoCodeSelectedLang()?>" scrolling="no" id="prestastore_update">
 				<p>Your browser does not support iframes.</p>

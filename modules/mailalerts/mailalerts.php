@@ -102,14 +102,14 @@ class MailAlerts extends Module
 		foreach ($params['cart']->getProducts() AS $key => $product)
 		{
 			$unit_price = Product::getPriceStatic($product['id_product'], true, $product['id_product_attribute']);
-			$price = Product::getPriceStatic($product['id_product'], true, $product['id_product_attribute'], 6, NULL, false, true, $product['quantity']);
+			$price = Product::getPriceStatic($product['id_product'], true, $product['id_product_attribute'], 6, NULL, false, true, $product['cart_quantity']);
 			$itemsTable .=
 				'<tr style="background-color:'.($key % 2 ? '#DDE2E6' : '#EBECEE').';">
 					<td style="padding:0.6em 0.4em;">'.$product['reference'].'</td>
 					<td style="padding:0.6em 0.4em;"><strong>'.$product['name'].(isset($product['attributes_small']) ? ' '.$product['attributes_small'] : '').'</strong></td>
 					<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice($unit_price, $currency, false, false).'</td>
-					<td style="padding:0.6em 0.4em; text-align:center;">'.intval($product['quantity']).'</td>
-					<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice(($price * $product['quantity']), $currency, false, false).'</td>
+					<td style="padding:0.6em 0.4em; text-align:center;">'.intval($product['cart_quantity']).'</td>
+					<td style="padding:0.6em 0.4em; text-align:right;">'.Tools::displayPrice(($price * $product['cart_quantity']), $currency, false, false).'</td>
 				</tr>';
 		}
 		foreach ($params['cart']->getDiscounts() AS $discount)
@@ -212,7 +212,7 @@ class MailAlerts extends Module
 
 	public function hookUpdateQuantity($params)
 	{
-		$qty = intval($params['product']['quantity_attribute'] ? $params['product']['quantity_attribute'] : $params['product']['stock_quantity']) - intval($params['product']['quantity']);
+		$qty = intval($params['product']['quantity_attribute'] ? $params['product']['quantity_attribute'] : $params['product']['stock_quantity']) - intval($params['product']['cart_quantity']);
 		if ($qty <= intval(Configuration::get('PS_LAST_QTIES')) AND !(!$this->_merchant_oos OR empty($this->_merchant_mails)) AND Configuration::get('PS_STOCK_MANAGEMENT'))
 		{
 			$templateVars = array(
@@ -271,6 +271,8 @@ class MailAlerts extends Module
 				$customer_id = 0;
 			}
 			Mail::Send(intval(Configuration::get('PS_LANG_DEFAULT')), 'customer_qty', $this->l('Product available'), $templateVars, strval($customer_email), NULL, strval(Configuration::get('PS_SHOP_EMAIL')), strval(Configuration::get('PS_SHOP_NAME')), NULL, NULL, dirname(__FILE__).'/mails/');
+			if ($customer_id)
+				$customer_email = 0;
 			self::deleteAlert(intval($customer_id), strval($customer_email), intval($id_product), intval($id_product_attribute));
 		}
 	}

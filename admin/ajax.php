@@ -74,9 +74,9 @@ if (isset($_GET['ajaxDiscountCustomers']))
 }
 
 if (Tools::getValue('page') == 'prestastore')
-	readfile('http://www.prestastore.com/adminmodules.php');
+	readfile('http://www.prestastore.com/adminmodules.php?lang='.Language::getIsoById($cookie->id_lang));
 if (Tools::getValue('page') == 'themes')
-	readfile('http://www.prestastore.com/adminthemes.php');
+	readfile('http://www.prestastore.com/adminthemes.php?lang='.Language::getIsoById($cookie->id_lang));
 
 if ($step = intval(Tools::getValue('ajaxProductTab')))
 {
@@ -191,7 +191,8 @@ if (isset($_GET['ajaxStates']) AND isset($_GET['id_country']))
 	$states = Db::getInstance()->ExecuteS('
 	SELECT s.id_state, s.name
 	FROM '._DB_PREFIX_.'state s
-	WHERE s.id_country = '.intval(Tools::getValue('id_country')).' AND s.active = 1');
+	LEFT JOIN '._DB_PREFIX_.'country c ON (s.`id_country` = c.`id_country`)
+	WHERE s.id_country = '.intval(Tools::getValue('id_country')).' AND s.active = 1 AND c.`contains_states` = 1');
 	
 	$list = '<option value="0">-----------</option>'."\n";
 	foreach ($states AS $state)

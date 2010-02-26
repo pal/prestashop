@@ -49,7 +49,7 @@ class AdminManufacturers extends AdminTab
 		$this->_selectAddresses = 'cl.`name` as country, m.`name` AS manufacturer_name';
 		$this->_includeTab = array('Addresses' => array('addressType' => 'manufacturer', 'fieldsDisplay' => $this->fieldsDisplayAddresses, '_join' => $this->_joinAddresses, '_select' => $this->_selectAddresses));
 		$this->view = true;
-		$this->_select = 'COUNT(`id_product`) AS `products`, (SELECT COUNT(ad.`id_manufacturer`) as `addresses` FROM `'._DB_PREFIX_.'address` ad WHERE ad.`id_manufacturer` = a.`id_manufacturer` GROUP BY ad.`id_manufacturer`) as `addresses`';
+		$this->_select = 'COUNT(`id_product`) AS `products`, (SELECT COUNT(ad.`id_manufacturer`) as `addresses` FROM `'._DB_PREFIX_.'address` ad WHERE ad.`id_manufacturer` = a.`id_manufacturer` AND ad.`deleted` = 0 GROUP BY ad.`id_manufacturer`) as `addresses`';
 		$this->_join = 'LEFT JOIN `'._DB_PREFIX_.'product` p ON (a.`id_manufacturer` = p.`id_manufacturer`)';
 		$this->_joinCount = false;
 		$this->_group = 'GROUP BY a.`id_manufacturer`';
@@ -149,6 +149,7 @@ class AdminManufacturers extends AdminTab
 					theme_advanced_statusbar_location : "bottom",
 					theme_advanced_resizing : true,
 					content_css : "'.__PS_BASE_URI__.'themes/'._THEME_NAME_.'/css/global.css",
+					document_base_url : "'.__PS_BASE_URI__.'",
 					// Drop lists for link/image/media/template dialogs
 					template_external_list_url : "lists/template_list.js",
 					external_link_list_url : "lists/link_list.js",

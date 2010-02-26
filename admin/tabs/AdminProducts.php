@@ -171,7 +171,8 @@ class AdminProducts extends AdminTab
 					AND Product::duplicateQuantityDiscount($id_product_old, $product->id)
 					AND Pack::duplicate($id_product_old, $product->id)
 					AND Product::duplicateCustomizationFields($id_product_old, $product->id)
-					AND Product::duplicateTags($id_product_old, $product->id))
+					AND Product::duplicateTags($id_product_old, $product->id)
+					AND Product::duplicateDownload($id_product_old, $product->id))
 					{
 						if (!Tools::getValue('noimage') AND !Image::duplicateProductImages($id_product_old, $product->id, $combinationImages))
 							$this->_errors[] = Tools::displayError('an error occurred while copying images');
@@ -1515,9 +1516,10 @@ class AdminProducts extends AdminTab
 					{
 						$('#virtual_product_file').remove();
 						$('#virtual_product_file_label').hide();
+						$('#file_missing').hide();
 						$('#virtual_product_name').attr('value', fileName);
 						$('#upload-confirmation').html(
-							'<a class="link" href="get-file-admin.php?file=' + msg + '"><?php echo $this->l('The file') ?>&nbsp;"' + fileName + '"&nbsp;<?php echo $this->l('has successfully been uploaded') ?></a>' +
+							'<a class="link" href="get-file-admin.php?file='+msg+'&filename='+fileName+'"><?php echo $this->l('The file') ?>&nbsp;"' + fileName + '"&nbsp;<?php echo $this->l('has successfully been uploaded') ?></a>' +
 							'<input type="hidden" id="virtual_product_filename" name="virtual_product_filename" value="' + msg + '" />');
 					}
 				}
@@ -1560,7 +1562,7 @@ class AdminProducts extends AdminTab
 				<p class="block">
 	<?php if(!$productDownload->checkFile()): ?>
 		<?php if($productDownload->id): ?>
-					<p class="alert">
+					<p class="alert" id="file_missing">
 						<?php echo $this->l('This product is missing') ?>:<br/>
 						<?php echo realpath(_PS_DOWNLOAD_DIR_) .'/'. $productDownload->physically_filename ?>
 					</p>
@@ -1617,7 +1619,7 @@ class AdminProducts extends AdminTab
 					<tr>
 						<td class="col-left">'.$this->l('Pre-tax wholesale price:').'</td>
 						<td style="padding-bottom:5px;">
-							'.($currency->format == 1 ? $currency->sign.' ' : '').'<input size="11" maxlength="14" name="wholesale_price" type="text" value="'.htmlentities($this->getFieldValue($obj, 'wholesale_price'), ENT_COMPAT, 'UTF-8').'" onKeyUp="javascript:this.value = this.value.replace(/,/g, \'.\');" />'.($currency->format == 2 ? ' '.$currency->sign : '').'
+							'.($currency->format == 1 ? $currency->sign.' ' : '').'<input size="11" maxlength="14" name="wholesale_price" type="text" value="'.htmlentities($this->getFieldValue($obj, 'wholesale_price'), ENT_COMPAT, 'UTF-8').'" onchange="this.value = this.value.replace(/,/g, \'.\');" />'.($currency->format == 2 ? ' '.$currency->sign : '').'
 							<span style="margin-left:10px">'.$this->l('The wholesale price at which you bought this product').'</span>
 						</td>
 					</tr>';
@@ -1625,7 +1627,7 @@ class AdminProducts extends AdminTab
 					<tr>
 						<td class="col-left">'.$this->l('Pre-tax retail price:').'</td>
 						<td style="padding-bottom:5px;">
-							'.($currency->format == 1 ? $currency->sign.' ' : '').'<input size="11" maxlength="14" id="priceTE" name="price" type="text" value="'.$this->getFieldValue($obj, 'price').'" onKeyUp="javascript:this.value = this.value.replace(/,/g, \'.\'); calcPriceTI();" />'.($currency->format == 2 ? ' '.$currency->sign : '').'<sup> *</sup>
+							'.($currency->format == 1 ? $currency->sign.' ' : '').'<input size="11" maxlength="14" id="priceTE" name="price" type="text" value="'.$this->getFieldValue($obj, 'price').'" onchange="this.value = this.value.replace(/,/g, \'.\');" onkeyup="calcPriceTI();" />'.($currency->format == 2 ? ' '.$currency->sign : '').'<sup> *</sup>
 							<span style="margin-left:2px">'.$this->l('The pre-tax retail price to sell this product').'</span>
 						</td>
 					</tr>';
@@ -1659,14 +1661,14 @@ class AdminProducts extends AdminTab
 					<tr>
 						<td class="col-left">'.$this->l('Retail price with tax:').'</td>
 						<td style="padding-bottom:5px;">
-							'.($currency->format == 1 ? ' '.$currency->sign : '').' <input size="11" maxlength="14" id="priceTI" type="text" value="" onKeyUp="noComma(\'priceTI\'); calcPriceTE();" />'.($currency->format == 2 ? ' '.$currency->sign : '').'
+							'.($currency->format == 1 ? ' '.$currency->sign : '').' <input size="11" maxlength="14" id="priceTI" type="text" value="" onchange="noComma(\'priceTI\');" onkeyup="calcPriceTE();" />'.($currency->format == 2 ? ' '.$currency->sign : '').'
 							<span style="margin-left:10px">
 						</td>
 					</tr>
 					<tr>
 						<td class="col-left">'.$this->l('Eco-tax:').'</td>
 						<td style="padding-bottom:5px;">
-							'.($currency->format == 1 ? $currency->sign.' ' : '').'<input size="11" maxlength="14" id="ecotax" name="ecotax" type="text" value="'.$this->getFieldValue($obj, 'ecotax').'" onKeyUp="javascript:this.value = this.value.replace(/,/g, \'.\'); if (parseInt(this.value) > getE(\'priceTE\').value) this.value = getE(\'priceTE\').value; if (isNaN(this.value)) this.value = 0;" />'.($currency->format == 2 ? ' '.$currency->sign : '').'
+							'.($currency->format == 1 ? $currency->sign.' ' : '').'<input size="11" maxlength="14" id="ecotax" name="ecotax" type="text" value="'.$this->getFieldValue($obj, 'ecotax').'" onkeyup="this.value = this.value.replace(/,/g, \'.\'); if (parseInt(this.value) > getE(\'priceTE\').value) this.value = getE(\'priceTE\').value; if (isNaN(this.value)) this.value = 0;" />'.($currency->format == 2 ? ' '.$currency->sign : '').'
 							<span style="margin-left:10px">('.$this->l('already included in price').')</span>
 						</td>
 					</tr>
@@ -1991,6 +1993,7 @@ class AdminProducts extends AdminTab
 						theme_advanced_statusbar_location : "bottom",
 						theme_advanced_resizing : true,
 						content_css : "'.__PS_BASE_URI__.'themes/'._THEME_NAME_.'/css/global.css",
+						document_base_url : "'.__PS_BASE_URI__.'",
 						// Drop lists for link/image/media/template dialogs
 						template_external_list_url : "lists/template_list.js",
 						external_link_list_url : "lists/link_list.js",

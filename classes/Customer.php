@@ -124,15 +124,17 @@ class		Customer extends ObjectModel
 		$this->birthday = (empty($this->years) ? $this->birthday : intval($this->years).'-'.intval($this->months).'-'.intval($this->days));
 		if ($this->newsletter AND !$this->newsletter_date_add)
 			$this->newsletter_date_add = date('Y-m-d H:i:s');
+		if ($this->dni === 0)
+			$this->dni = NULL;
 	 	return parent::update(true);
 	}
 	
 	public function delete()
 	{
 		$addresses = $this->getAddresses(intval(Configuration::get('PS_LANG_DEFAULT')));
-		foreach ($addresses as $address)
+		foreach ($addresses AS $address)
 		{
-			$obj = new Address($address['id_address']);
+			$obj = new Address(intval($address['id_address']));
 			$obj->delete();
 		}
 		return parent::delete();
@@ -271,12 +273,10 @@ class		Customer extends ObjectModel
 		return Db::getInstance()->ExecuteS('
 		SELECT a.*, cl.`name` AS country, s.name AS state
 		FROM `'._DB_PREFIX_.'address` a
-		LEFT JOIN `'._DB_PREFIX_.'country` c ON a.`id_country` = c.`id_country`
-		LEFT JOIN `'._DB_PREFIX_.'country_lang` cl ON c.`id_country` = cl.`id_country`
-		LEFT JOIN `'._DB_PREFIX_.'state` s ON s.`id_state` = a.`id_state`
-		WHERE `id_lang` = '.intval($id_lang).'
-		AND `id_customer` = '.intval($this->id).'
-		AND a.`deleted` = 0');
+		LEFT JOIN `'._DB_PREFIX_.'country` c ON (a.`id_country` = c.`id_country`)
+		LEFT JOIN `'._DB_PREFIX_.'country_lang` cl ON (c.`id_country` = cl.`id_country`)
+		LEFT JOIN `'._DB_PREFIX_.'state` s ON (s.`id_state` = a.`id_state`)
+		WHERE `id_lang` = '.intval($id_lang).' AND `id_customer` = '.intval($this->id).' AND a.`deleted` = 0');
 	}
 
 
@@ -502,6 +502,21 @@ class		Customer extends ObjectModel
 		SELECT * FROM `'._DB_PREFIX_.'orders` o
 		LEFT JOIN `'._DB_PREFIX_.'order_detail` od ON o.id_order = od.id_order
 		WHERE o.valid = 1 AND o.`id_customer` = '.intval($this->id));
+	}
+	
+	public function getNeedDNI()
+	{
+		$countries = Db::getInstance()->Executes('
+		SELECT `id_country` 
+		FROM `'._DB_PREFIX_.'address` 
+		WHERE `id_customer` = '.intval($this->id).' 
+		AND `deleted` = 0
+		');
+		
+		foreach($countries AS $country)
+			if (Country::getNeedIdentifcationNumber(intval($country['id_country'])))
+				return true;
+		return false;
 	}
 }
 

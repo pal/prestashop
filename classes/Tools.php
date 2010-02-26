@@ -354,6 +354,7 @@ class Tools
 	{
 		global $_ERRORS;
 
+		//if ($string == 'Hack attempt') d(debug_backtrace());
 		if (!is_array($_ERRORS))
 			return str_replace('"', '&quot;', $string);
 		$key = md5(str_replace('\'', '\\\'', $string));
@@ -445,7 +446,7 @@ class Tools
 				WHERE id_lang = '.intval($id_lang).' AND id_category = '.intval($id_category));
 				if ($row)
 				{
-					if (!empty($row['meta_description']))
+					if (empty($row['meta_description']))
 						$row['meta_description'] = strip_tags($row['description']);
 					return self::completeMetaTags($row, Category::hideCategoryPosition($row['name']));
 				}

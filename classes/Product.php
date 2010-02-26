@@ -1331,17 +1331,32 @@ class		Product extends ObjectModel
 	*/
 	public static function getPriceStatic($id_product, $usetax = true, $id_product_attribute = NULL, $decimals = 6, $divisor = NULL, $only_reduc = false, $usereduc = true, $quantity = 1, $forceAssociatedTax = false, $id_customer = NULL, $id_cart = NULL, $id_address_delivery = NULL)
 	{
-		global $cookie;
+		global $cookie, $cart;
 
 		// Get id_customer if exists
 		if (!$id_customer)
-			$id_customer = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_customer) AND $cookie->id_customer) ? intval($cookie->id_customer) : null);
+			$id_customer = ((Validate::isCookie($cookie) AND isset($cookie->id_customer) AND $cookie->id_customer) ? intval($cookie->id_customer) : null);
 
-		if (!$id_cart)
-			$id_cart = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_cart) AND $cookie->id_cart) ? intval($cookie->id_cart) : null);
+		if (!is_object($cart))
+		{
+			/*
+			* When a user (e.g., guest, customer, Google...) is on PrestaShop, he has already its cart as the global (see /init.php)
+			* When a non-user calls directly this method (e.g., payment module...) is on PrestaShop, he does not have already it BUT knows the cart ID
+			*/
+			if (!$id_cart AND !Validate::isCookie($cookie))
+				die(Tools::displayError());
+			$cart = $id_cart ? new Cart(intval($id_cart)) : new Cart(intval($cookie->id_cart));
+		}
+
+		if (Validate::isLoadedObject($cart))
+			$currency = new Currency(intval($cart->id_currency));
+		elseif (isset($cookie->id_currency) AND intval($cookie->id_currency))
+			$currency = new Currency(intval($cookie->id_currency));
+		else
+			$currency = new Currency(intval(Configuration::get('PS_CURRENCY_DEFAULT')));
 
 		if (!$id_address_delivery)
-			$id_address_delivery = ((isset($cookie) AND get_class($cookie) == 'Cookie' AND isset($cookie->id_address_delivery) AND $cookie->id_address_delivery) ? intval($cookie->id_address_delivery) : null);
+			$id_address_delivery = $cart->id_address_delivery;
 
 		if (!Validate::isBool($usetax) OR !Validate::isUnsignedId($id_product))
 			die(Tools::displayError());
@@ -1359,7 +1374,7 @@ class		Product extends ObjectModel
 		'.($id_product_attribute ? 'LEFT JOIN `'._DB_PREFIX_.'product_attribute` pa ON pa.`id_product_attribute` = '.intval($id_product_attribute) : '').'
 		LEFT JOIN `'._DB_PREFIX_.'tax` AS t ON t.`id_tax` = p.`id_tax`
 		WHERE p.`id_product` = '.intval($id_product));
-		$price = Tools::convertPrice(floatval($result['price']));
+		$price = Tools::convertPrice(floatval($result['price']), $currency);
 
 		// Exclude tax
 		$tax = floatval(Tax::getApplicableTax(intval($result['id_tax']), floatval($result['rate']), ($id_address_delivery ? intval($id_address_delivery) : NULL)));
@@ -1371,7 +1386,7 @@ class		Product extends ObjectModel
 			$price = $price * (1 + ($tax / 100));
 
 		// Attribute price
-		$attribute_price = Tools::convertPrice(array_key_exists('attribute_price', $result) ? floatval($result['attribute_price']) : 0);
+		$attribute_price = Tools::convertPrice((array_key_exists('attribute_price', $result) ? floatval($result['attribute_price']) : 0), $currency);
 		$attribute_price = $usetax ? Tools::ps_round($attribute_price, 2) : ($attribute_price / (1 + (($tax ? $tax : $result['rate']) / 100)));
 		$price += $attribute_price;
 		if ($only_reduc OR $usereduc)
@@ -1385,8 +1400,8 @@ class		Product extends ObjectModel
 		if ($usereduc)
 			$price -= $reduc;
 
-		// Quantity discount
 		if (intval($id_cart))
+		// Quantity discount
 		{
 			$totalQuantity = intval(Db::getInstance()->getValue('
 				SELECT SUM(`quantity`)
@@ -1889,6 +1904,18 @@ class		Product extends ObjectModel
 		$query = 'INSERT INTO `'._DB_PREFIX_.'product_tag` (`id_product`, `id_tag`) VALUES';
 		while ($row = Db::getInstance()->nextRow($resource))
 			$query .= ' ('.intval($id_product_new).', '.intval($row['id_tag']).'),';
+		$query = rtrim($query, ',');
+		return Db::getInstance()->Execute($query);
+	}
+
+	static public function duplicateDownload($id_product_old, $id_product_new)
+	{
+		$resource = Db::getInstance()->Execute('SELECT `display_filename`, `physically_filename`, `date_deposit`, `date_expiration`, `nb_days_accessible`, `nb_downloadable`, `active` FROM `'._DB_PREFIX_.'product_download` WHERE `id_product` = '.intval($id_product_old));
+		if (!Db::getInstance()->NumRows())
+			return true;
+		$query = 'INSERT INTO `'._DB_PREFIX_.'product_download` (`id_product`, `display_filename`, `physically_filename`, `date_deposit`, `date_expiration`, `nb_days_accessible`, `nb_downloadable`, `active`) VALUES';
+		while ($row = Db::getInstance()->nextRow($resource))
+			$query .= ' ('.intval($id_product_new).', \''.pSQL($row['display_filename']).'\', \''.pSQL($row['physically_filename']).'\', \''.pSQL($row['date_deposit']).'\', \''.pSQL($row['date_expiration']).'\', '.intval($row['nb_days_accessible']).', '.intval($row['nb_downloadable']).', '.intval($row['active']).'),';
 		$query = rtrim($query, ',');
 		return Db::getInstance()->Execute($query);
 	}

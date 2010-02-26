@@ -252,7 +252,7 @@ class		Cart extends ObjectModel
 			if ($this->_taxCalculationMethod == PS_TAX_EXC)
 			{
 				$row['price'] = Product::getPriceStatic(intval($row['id_product']), false, isset($row['id_product_attribute']) ? intval($row['id_product_attribute']) : NULL, 2, NULL, false, true, intval($row['cart_quantity']), false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL)); // Here taxes are computed only once the quantity has been applied to the product price
-				$row['price_wt'] = 0.0;
+				$row['price_wt'] = Product::getPriceStatic(intval($row['id_product']), true, isset($row['id_product_attribute']) ? intval($row['id_product_attribute']) : NULL, 2, NULL, false, true, intval($row['cart_quantity']), false, (intval($this->id_customer) ? intval($this->id_customer) : NULL), intval($this->id), (intval($this->id_address_delivery) ? intval($this->id_address_delivery) : NULL));
 				$row['total_wt'] = Tools::ps_round($row['price'] * floatval($row['cart_quantity']) * (1 + floatval($row['rate']) / 100), 2);
 			}
 			else
@@ -515,7 +515,13 @@ class		Cart extends ObjectModel
 	{
 		self::$_nbProducts = 0;
 		if (intval($id_customization))
-			return $this->_deleteCustomization(intval($id_customization), intval($id_product), intval($id_product_attribute)) AND $this->deleteProduct(intval($id_product), $id_product_attribute, NULL);
+		{
+			$productTotalQuantity = intval(Db::getInstance()->getValue('SELECT `quantity` FROM `'._DB_PREFIX_.'cart_product` WHERE `id_product` = '.intval($id_product).' AND `id_product_attribute` = '.intval($id_product_attribute)));
+			$customizationQuantity = intval(Db::getInstance()->getValue('SELECT `quantity` FROM `'._DB_PREFIX_.'customization` WHERE `id_cart` = '.intval($this->id).' AND `id_product` = '.intval($id_product).' AND `id_product_attribute` = '.intval($id_product_attribute)));
+			if (!$this->_deleteCustomization(intval($id_customization), intval($id_product), intval($id_product_attribute)))
+				return false;
+			return ($customizationQuantity == $productTotalQuantity AND $this->deleteProduct(intval($id_product), $id_product_attribute, NULL));
+		}
 
 		/* Get customization quantity */
 		if (($result = Db::getInstance()->getRow('SELECT SUM(`quantity`) AS \'quantity\' FROM `'._DB_PREFIX_.'customization` WHERE `id_cart` = '.intval($this->id).' AND `id_product` = '.intval($id_product).' AND `id_product_attribute` = '.intval($id_product_attribute))) === false)
@@ -614,10 +620,10 @@ class		Cart extends ObjectModel
 		if ($this->gift)
 		{
 			$wrapping_fees = floatval(Configuration::get('PS_GIFT_WRAPPING_PRICE'));
-			if (!$withTaxes)
+			if ($withTaxes)
 			{
 				$wrapping_fees_tax = new Tax(intval(Configuration::get('PS_GIFT_WRAPPING_TAX')));
-				$wrapping_fees /= 1 + ((floatval($wrapping_fees_tax->rate) / 100));
+				$wrapping_fees *= 1 + ((floatval($wrapping_fees_tax->rate) / 100));
 			}
 			$wrapping_fees = Tools::ps_round($wrapping_fees, 2);
 		}
@@ -767,11 +773,12 @@ class		Cart extends ObjectModel
 			else
 				$shipping_cost += $carrier->getDeliveryPriceByPrice($orderTotal, $id_zone);
 		}
-		$shipping_cost = Tools::convertPrice($shipping_cost);
 		
 		// Adding handling charges
 		if (isset($configuration['PS_SHIPPING_HANDLING']) AND $carrier->shipping_handling)
-            $shipping_cost += floatval($configuration['PS_SHIPPING_HANDLING']);
+			$shipping_cost += floatval($configuration['PS_SHIPPING_HANDLING']);
+		
+		$shipping_cost = Tools::convertPrice($shipping_cost, new Currency(intval($this->id_currency)));
 		
 		// Apply tax
 		if (isset($carrierTax))
@@ -1080,7 +1087,7 @@ class		Cart extends ObjectModel
 		return ($echo == '0' ? Configuration::get('PS_SHOP_NAME') : $echo);
 	}
 
-  /* DEPRECATED */
+	/* DEPRECATED */
 	public function getCustomeremail()
 	{
 		$customer = new Customer(intval($this->id_customer));

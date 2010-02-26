@@ -49,19 +49,19 @@ $_MODULES = array();
 
 $currency = Tools::setCurrency();
 
-if (is_numeric($cookie->id_cart))
+if (intval($cookie->id_cart))
 {
 	$cart = new Cart(intval($cookie->id_cart));
-	$cart->id_lang = intval($cookie->id_lang);
 	if ($cart->OrderExists())
 		unset($cookie->id_cart, $cart);
-	else
-	{	
+	elseif ($cookie->id_customer != $cart->id_customer OR $cookie->id_lang != $cart->id_lang OR $cookie->id_currency != $cart->id_currency)
+	{
 		if ($cookie->id_customer)
-    		$cart->id_customer = intval($cookie->id_customer);
-    	$cart->id_currency = intval($cookie->id_currency);
-    	$cart->update();
-    }
+			$cart->id_customer = intval($cookie->id_customer);
+		$cart->id_lang = intval($cookie->id_lang);
+		$cart->id_currency = intval($cookie->id_currency);
+		$cart->update();
+	}
 }
 
 if (!isset($cart) OR !$cart->id)
@@ -71,7 +71,16 @@ if (!isset($cart) OR !$cart->id)
     $cart->id_currency = intval($cookie->id_currency);
 	$cart->id_guest = intval($cookie->id_guest);
     if ($cookie->id_customer)
+	{
     	$cart->id_customer = intval($cookie->id_customer);
+		$cart->id_address_delivery = intval(Address::getFirstCustomerAddressId($cart->id_customer));
+		$cart->id_address_invoice = $cart->id_address_delivery;
+	}
+	else
+	{
+		$cart->id_address_delivery = 0;
+		$cart->id_address_invoice = 0;
+	}
 }
 if (!$cart->nbProducts())
 	$cart->id_carrier = NULL;
@@ -106,8 +115,8 @@ $smarty->assign('navigationPipe', $navigationPipe);
 $server_host = Tools::getHttpHost(false, true);
 $protocol = 'http://';
 $protocol_ssl = 'https://';
-$protocol_link = (Configuration::get('PS_SSL_ENABLED')) ? $protocol_ssl : $protocol;
-$protocol_content = (isset($useSSL) AND $useSSL AND Configuration::get('PS_SSL_ENABLED')) ? $protocol_ssl : $protocol;
+$protocol_link = (Configuration::get('PS_SSL_ENABLED') OR (isset($_SERVER['HTTPS']) AND $_SERVER['HTTPS'])) ? $protocol_ssl : $protocol;
+$protocol_content = ((isset($useSSL) AND $useSSL AND Configuration::get('PS_SSL_ENABLED')) OR (isset($_SERVER['HTTPS']) AND $_SERVER['HTTPS'])) ? $protocol_ssl : $protocol;
 define('_PS_BASE_URL_', $protocol.$server_host);
 
 Product::initPricesComputation();
@@ -153,7 +162,7 @@ if (!Configuration::get('PS_THEME_V11'))
 }
 else
 {
-	$protocol = (isset($useSSL) AND $useSSL AND Configuration::get('PS_SSL_ENABLED')) ? 'https://' : 'http://';
+	$protocol = ((isset($useSSL) AND $useSSL AND Configuration::get('PS_SSL_ENABLED')) OR $_SERVER['HTTPS']) ? 'https://' : 'http://';
 	$smarty->assign(array(
 		'base_dir' => __PS_BASE_URI__,
 		'base_dir_ssl' => Tools::getHttpHost(true, true).__PS_BASE_URI__,

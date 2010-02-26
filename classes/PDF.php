@@ -704,7 +704,7 @@ class PDF extends PDF_PageGroup
 		if (!$id_zone = Address::getZoneById(intval(self::$order->id_address_invoice)))
 			die(Tools::displayError());
 
-		if (self::$order->total_paid == '0.00' OR !intval(Configuration::get('PS_TAX')))
+		if (self::$order->total_paid == '0.00')
 			return ;
 
 		// Setting products tax
@@ -804,7 +804,7 @@ class PDF extends PDF_PageGroup
 		if (!$id_zone = Address::getZoneById(intval(self::$order->id_address_invoice)))
 			die(Tools::displayError());
 
-		if (self::$order->total_paid == '0.00' OR !intval(Configuration::get('PS_TAX')))
+		if (self::$order->total_paid == '0.00' OR (!intval(Configuration::get('PS_TAX')) AND self::$order->total_products == self::$order->total_products_wt))
 			return ;
 
 		// Setting products tax
@@ -866,6 +866,9 @@ class PDF extends PDF_PageGroup
 		// Display wrapping tax
 		if (self::$order->total_wrapping AND self::$order->total_wrapping != '0.00')
 		{
+			$tax = new Tax(intval(Configuration::get('PS_GIFT_WRAPPING_TAX')));
+			$taxRate = $tax->rate;
+			
 			$nb_tax++;
 			$before = $this->GetY();
 			$lineSize = $this->GetY() - $before;
